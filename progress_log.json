@@ -1,0 +1,648 @@
+{
+  "meta": {
+    "current_week": 2,
+    "cycle_start_date": "2026-05-26",
+    "last_run_date": "2026-05-27",
+    "last_email_sent_date": "2026-05-27",
+    "last_email_subject": "Week 2 Gym Plan",
+    "is_first_run": false
+  },
+  "deload": {
+    "is_deload_week": false,
+    "last_deload_date": null,
+    "deload_count_total": 0,
+    "consecutive_progression_weeks": 1,
+    "deload_history": []
+  },
+  "fatigue_tracking": {
+    "consecutive_no_progress_weeks": 0,
+    "days_consecutive_decline": {
+      "MON": 0,
+      "WED": 0,
+      "FRI": 0,
+      "SAT": 0
+    }
+  },
+  "exercises": {
+    "monday": [
+      {
+        "num": "1",
+        "exercise": "Wall Handstand",
+        "sets": "3",
+        "reps": "30 s",
+        "weight": "BW",
+        "weight_kg": null,
+        "weight_type": "bw_only",
+        "rest": "60 s",
+        "history": [
+          {
+            "week": 1,
+            "weight": "BW",
+            "weight_kg": null,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "BW",
+            "weight_kg": null,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "2",
+        "exercise": "Bench Press",
+        "sets": "3",
+        "reps": "6\u20138",
+        "weight": "70 kg",
+        "weight_kg": 70.0,
+        "weight_type": "barbell",
+        "rest": "3 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "70 kg",
+            "weight_kg": 70.0,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "70 kg",
+            "weight_kg": 70.0,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "3",
+        "exercise": "Incline DB Press",
+        "sets": "3",
+        "reps": "10",
+        "weight": "22.5 kg/DB",
+        "weight_kg": 22.5,
+        "weight_type": "dumbbell",
+        "rest": "3 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "22.5 kg/DB",
+            "weight_kg": 22.5,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "22.5 kg/DB",
+            "weight_kg": 22.5,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "4",
+        "exercise": "Weighted Pull-up",
+        "sets": "4",
+        "reps": "6\u20138",
+        "weight": "BW + 5 kg",
+        "weight_kg": 5.0,
+        "weight_type": "bw_weighted",
+        "rest": "2\u20133 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "BW + 5 kg",
+            "weight_kg": 5.0,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "BW + 5 kg",
+            "weight_kg": 5.0,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "5",
+        "exercise": "DB Shoulder Press",
+        "sets": "3",
+        "reps": "8\u201310",
+        "weight": "15 kg/DB",
+        "weight_kg": 15.0,
+        "weight_type": "dumbbell",
+        "rest": "2 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "12.5 kg/DB",
+            "weight_kg": 12.5,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "15 kg/DB",
+            "weight_kg": 15.0,
+            "action": "increase"
+          }
+        ]
+      },
+      {
+        "num": "6",
+        "exercise": "Lateral Raise",
+        "sets": "3",
+        "reps": "15",
+        "weight": "9 kg",
+        "weight_kg": 9.0,
+        "weight_type": "dumbbell",
+        "rest": "60 s",
+        "history": [
+          {
+            "week": 1,
+            "weight": "9 kg",
+            "weight_kg": 9.0,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "9 kg",
+            "weight_kg": 9.0,
+            "action": "stay"
+          }
+        ]
+      }
+    ],
+    "wednesday": [
+      {
+        "num": "1",
+        "exercise": "Barbell Squat",
+        "sets": "4",
+        "reps": "5\u20136",
+        "weight": "90 kg",
+        "weight_kg": 90.0,
+        "weight_type": "barbell",
+        "rest": "3 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "90 kg",
+            "weight_kg": 90.0,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "90 kg",
+            "weight_kg": 90.0,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "2",
+        "exercise": "Leg Press",
+        "sets": "3",
+        "reps": "10\u201312",
+        "weight": "126 kg",
+        "weight_kg": 126.0,
+        "weight_type": "machine",
+        "rest": "2 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "126 kg",
+            "weight_kg": 126.0,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "126 kg",
+            "weight_kg": 126.0,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "3",
+        "exercise": "Romanian DL",
+        "sets": "3",
+        "reps": "10",
+        "weight": "75 kg",
+        "weight_kg": 75.0,
+        "weight_type": "barbell",
+        "rest": "2\u20133 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "75 kg",
+            "weight_kg": 75.0,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "75 kg",
+            "weight_kg": 75.0,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "4",
+        "exercise": "Leg Curl",
+        "sets": "3",
+        "reps": "10\u201312",
+        "weight": "start moderate",
+        "weight_kg": null,
+        "weight_type": "skip",
+        "rest": "90 s",
+        "history": [
+          {
+            "week": 1,
+            "weight": "start moderate",
+            "weight_kg": null,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "start moderate",
+            "weight_kg": null,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "5",
+        "exercise": "Calf Raise",
+        "sets": "3",
+        "reps": "15",
+        "weight": "36 kg",
+        "weight_kg": 36.0,
+        "weight_type": "barbell",
+        "rest": "60 s",
+        "history": [
+          {
+            "week": 1,
+            "weight": "36 kg",
+            "weight_kg": 36.0,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "36 kg",
+            "weight_kg": 36.0,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "6",
+        "exercise": "Hanging Leg Raise",
+        "sets": "3",
+        "reps": "10",
+        "weight": "BW",
+        "weight_kg": null,
+        "weight_type": "bw_only",
+        "rest": "90 s",
+        "history": [
+          {
+            "week": 1,
+            "weight": "BW",
+            "weight_kg": null,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "BW",
+            "weight_kg": null,
+            "action": "stay"
+          }
+        ]
+      }
+    ],
+    "friday": [
+      {
+        "num": "1",
+        "exercise": "Explosive Pull-up",
+        "sets": "3",
+        "reps": "4\u20135",
+        "weight": "BW",
+        "weight_kg": null,
+        "weight_type": "bw_only",
+        "rest": "2 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "BW",
+            "weight_kg": null,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "BW",
+            "weight_kg": null,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "2",
+        "exercise": "Machine Chest Press",
+        "sets": "3",
+        "reps": "10",
+        "weight": "start moderate",
+        "weight_kg": null,
+        "weight_type": "skip",
+        "rest": "2 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "start moderate",
+            "weight_kg": null,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "start moderate",
+            "weight_kg": null,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "3",
+        "exercise": "Close-Grip Bench",
+        "sets": "3",
+        "reps": "8",
+        "weight": "50 kg",
+        "weight_kg": 50.0,
+        "weight_type": "barbell",
+        "rest": "2 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "50 kg",
+            "weight_kg": 50.0,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "50 kg",
+            "weight_kg": 50.0,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "4",
+        "exercise": "Single-Arm DB Row",
+        "sets": "3",
+        "reps": "8\u201310",
+        "weight": "22.5 kg",
+        "weight_kg": 22.5,
+        "weight_type": "dumbbell",
+        "rest": "2 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "22.5 kg",
+            "weight_kg": 22.5,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "22.5 kg",
+            "weight_kg": 22.5,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "5",
+        "exercise": "OH Military Press",
+        "sets": "3",
+        "reps": "8",
+        "weight": "12.5 kg",
+        "weight_kg": 12.5,
+        "weight_type": "dumbbell",
+        "rest": "3 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "12.5 kg",
+            "weight_kg": 12.5,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "12.5 kg",
+            "weight_kg": 12.5,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "6",
+        "exercise": "Pec Deck (limit)",
+        "sets": "3",
+        "reps": "12",
+        "weight": "start moderate",
+        "weight_kg": null,
+        "weight_type": "skip",
+        "rest": "90 s",
+        "history": [
+          {
+            "week": 1,
+            "weight": "start moderate",
+            "weight_kg": null,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "start moderate",
+            "weight_kg": null,
+            "action": "stay"
+          }
+        ]
+      }
+    ],
+    "saturday": [
+      {
+        "num": "1",
+        "exercise": "Wall Handstand",
+        "sets": "3",
+        "reps": "30 s",
+        "weight": "BW",
+        "weight_kg": null,
+        "weight_type": "bw_only",
+        "rest": "60 s",
+        "history": [
+          {
+            "week": 1,
+            "weight": "BW",
+            "weight_kg": null,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "BW",
+            "weight_kg": null,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "2",
+        "exercise": "Deadlift",
+        "sets": "3",
+        "reps": "4\u20135",
+        "weight": "100 kg",
+        "weight_kg": 100.0,
+        "weight_type": "barbell",
+        "rest": "3+ min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "115 kg",
+            "weight_kg": 115.0,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "100 kg",
+            "weight_kg": 100.0,
+            "action": "decrease"
+          }
+        ]
+      },
+      {
+        "num": "3",
+        "exercise": "Hack Squat",
+        "sets": "3",
+        "reps": "8\u201310",
+        "weight": "start moderate",
+        "weight_kg": null,
+        "weight_type": "skip",
+        "rest": "2 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "start moderate",
+            "weight_kg": null,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "start moderate",
+            "weight_kg": null,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "4",
+        "exercise": "Weighted Chin-up",
+        "sets": "4",
+        "reps": "6",
+        "weight": "BW + 5 kg",
+        "weight_kg": 5.0,
+        "weight_type": "bw_weighted",
+        "rest": "2\u20133 min",
+        "history": [
+          {
+            "week": 1,
+            "weight": "BW + 5 kg",
+            "weight_kg": 5.0,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "BW + 5 kg",
+            "weight_kg": 5.0,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "5",
+        "exercise": "DB Bicep Curl",
+        "sets": "3",
+        "reps": "10",
+        "weight": "10 kg",
+        "weight_kg": 10.0,
+        "weight_type": "dumbbell",
+        "rest": "90 s",
+        "history": [
+          {
+            "week": 1,
+            "weight": "10 kg",
+            "weight_kg": 10.0,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "10 kg",
+            "weight_kg": 10.0,
+            "action": "stay"
+          }
+        ]
+      },
+      {
+        "num": "6",
+        "exercise": "Weighted Plank",
+        "sets": "3",
+        "reps": "60 s",
+        "weight": "BW + 5 kg",
+        "weight_kg": 5.0,
+        "weight_type": "bw_weighted",
+        "rest": "60 s",
+        "history": [
+          {
+            "week": 1,
+            "weight": "BW + 5 kg",
+            "weight_kg": 5.0,
+            "action": "initial"
+          },
+          {
+            "week": 2,
+            "weight": "BW + 5 kg",
+            "weight_kg": 5.0,
+            "action": "stay"
+          }
+        ]
+      }
+    ]
+  },
+  "week_history": [
+    {
+      "week": 1,
+      "date": "2026-05-26",
+      "reply_found": true,
+      "responses": {
+        "MON": "stay",
+        "WED": "stay",
+        "FRI": "stay",
+        "SAT": "-"
+      },
+      "comments": {
+        "MON": "Good",
+        "WED": "Good",
+        "FRI": "Good",
+        "SAT": "Deadlift felt heavy"
+      },
+      "deload_triggered": false,
+      "deload_reason": null,
+      "plus_count": 0,
+      "minus_count": 1,
+      "stay_count": 3
+    },
+    {
+      "week": 2,
+      "date": "2026-05-27",
+      "reply_found": false,
+      "responses": {},
+      "comments": {},
+      "deload_triggered": false,
+      "deload_reason": null,
+      "plus_count": 0,
+      "minus_count": 0,
+      "stay_count": 0
+    }
+  ]
+}

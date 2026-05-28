@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 *)",
+      "Skill(schedule)",
+      "Skill(schedule:*)",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  }
+}

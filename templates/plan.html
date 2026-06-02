@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page { size: A4 portrait; margin: 18mm 16mm; }
+    body { font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 11pt; color: #1a1a1a; }
+    h1 { font-size: 15pt; font-weight: 600; margin: 0 0 4px; }
+    .week-label { font-size: 10pt; color: #666; margin-bottom: 20px; }
+    .session { margin-bottom: 22px; page-break-inside: avoid; }
+    .session-header { font-size: 12pt; font-weight: 600; border-bottom: 2px solid #1a1a1a; padding-bottom: 4px; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 9pt; font-weight: 600; text-transform: uppercase;
+         letter-spacing: .05em; color: #555; border-bottom: 1px solid #ddd; padding: 4px 6px; }
+    td { padding: 7px 6px; border-bottom: 1px solid #eee; font-size: 10.5pt; vertical-align: top; }
+    .col-exercise { width: 38%; }
+    .col-sets     { width: 10%; text-align: center; }
+    .col-reps     { width: 10%; text-align: center; }
+    .col-load     { width: 14%; text-align: center; }
+    .col-actual   { width: 14%; }
+    .col-note     { width: 14%; font-size: 9.5pt; color: #555; }
+    .actual-box   { border-bottom: 1px solid #aaa; min-width: 48px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <h1>Week {{ week_label }}</h1>
+  <div class="week-label">Generated {{ generated_date }}</div>
+
+  {% for session in sessions %}
+  <div class="session">
+    <div class="session-header">{{ session.day }} — {{ session.label }}</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="col-exercise">Exercise</th>
+          <th class="col-sets">Sets</th>
+          <th class="col-reps">Reps</th>
+          <th class="col-load">Load (kg)</th>
+          <th class="col-actual">Actual</th>
+          <th class="col-note">Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ex in session.exercises %}
+        <tr>
+          <td class="col-exercise">{{ ex.name }}</td>
+          <td class="col-sets">{{ ex.sets }}</td>
+          <td class="col-reps">{{ ex.reps }}</td>
+          <td class="col-load">{{ ex.load_kg if ex.load_kg else '—' }}</td>
+          <td class="col-actual"><span class="actual-box">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td>
+          <td class="col-note">{{ ex.note }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+</body>
+</html>

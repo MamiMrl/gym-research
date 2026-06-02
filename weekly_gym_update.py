@@ -276,7 +276,7 @@ def update_fatigue_counters(progress: dict, parsed_reply: dict | None, deload_tr
         deload_info['deload_count_total'] += 1
         return progress
 
-    deload_info['weeks_since_last_deload'] += 1
+    deload_info['weeks_since_last_deload'] = deload_info.get('weeks_since_last_deload', 0) + 1
 
     if parsed_reply is None:
         return progress
@@ -401,35 +401,35 @@ def build_email_subject(week_num: int, is_deload: bool, is_reminder: bool) -> st
 
 
 def build_email_body(summary: str, week_num: int, is_deload: bool) -> str:
+    """Build plain text intro/outro that wraps the HTML workout plan in the email.
+
+    The full HTML workout (BVB dark theme) is embedded between the intro
+    and the reply instructions by the routine_agent when composing the email.
+    """
     deload_notice = ""
     if is_deload:
         deload_notice = """
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DELOAD WEEK — Your body needs this.
-Same weights as last week. Fewer sets (50-60% volume).
-Stop 3-4 RIR — do NOT approach failure.
+⚠ DELOAD WEEK — Same weights, ~50% sets, 3-4 RIR.
 Focus on movement quality, joints, and CNS recovery.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
     return f"""Hey Berke,
 
-Week {week_num} workout plan attached — print it or open on your phone.
+Week {week_num} workout plan below — embedded HTML renders inline; you can also print it directly to PDF from Gmail.
 {deload_notice}
---- LAST WEEK RECAP ---
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+LAST WEEK RECAP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {summary}
 
---- THIS WEEK'S PLAN ---
-See the attached PDF for all exercises, sets, reps, and weights.
-
-Shoulder rehab: 5×45s isometric external rotation hold before Mon, Fri, Sat sessions.
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REPLY WITH YOUR SCORES for this week's workouts:
+REPLY WITH YOUR SCORES for this week:
   + = increase weights next week
   - = decrease weights next week
   stay = keep the same
-  Add a comment after | (optional but helpful for tracking)
+  Add a comment after | (optional but helpful)
 
 MON: [+/-/stay] | [optional comment]
 WED: [+/-/stay] | [optional comment]
@@ -450,15 +450,37 @@ Train hard.
 # ── PDF generator ─────────────────────────────────────────────────────────────
 
 def generate_pdf(progress: dict, week_num: int, is_deload: bool) -> str:
-    """Generate PDF and return its path."""
+    """Generate PDF and return its path. Suppresses generator's stdout
+    prints so the only thing on stdout is our JSON output."""
     sys.path.insert(0, str(PDF_DIR))
     from generate_workout_pdf import WorkoutPDFGenerator
+    import contextlib, io
 
     output_path = str(PDF_DIR / f'Workout_Plan_Week_{week_num}.pdf')
     week_data = build_week_data(progress, is_deload=is_deload)
     generator = WorkoutPDFGenerator(output_path)
-    generator.build_pdf(week_data=week_data, week_num=week_num, is_deload=is_deload)
+    # Redirect noisy "✅ PDF generated" prints to stderr so stdout = JSON only
+    with contextlib.redirect_stdout(sys.stderr):
+        generator.build_pdf(week_data=week_data, week_num=week_num, is_deload=is_deload)
     return output_path
+
+
+# ── HTML generator ────────────────────────────────────────────────────────────
+
+def generate_html(progress: dict, week_num: int, is_deload: bool) -> tuple:
+    """Generate HTML workout file and return (path, content_string)."""
+    sys.path.insert(0, str(PDF_DIR))
+    from generate_workout_html import WorkoutHTMLGenerator
+
+    output_path = str(PDF_DIR / f'Workout_Plan_Week_{week_num}.html')
+    week_data = build_week_data(progress, is_deload=is_deload)
+    generator = WorkoutHTMLGenerator(output_path)
+    generator.build_html(week_data=week_data, week_num=week_num, is_deload=is_deload)
+
+    with open(output_path, 'r', encoding='utf-8') as f:
+        html_content = f.read()
+
+    return output_path, html_content
 
 
 # ── Init ──────────────────────────────────────────────────────────────────────
@@ -589,6 +611,7 @@ def main() -> None:
         week_num = progress['meta']['current_week']
 
     pdf_path = generate_pdf(progress, week_num, should_deload)
+    html_path, html_content = generate_html(progress, week_num, should_deload)
     summary  = build_progress_summary(progress, parsed_reply, should_deload, deload_reason)
     subject  = build_email_subject(week_num, should_deload, is_reminder)
     body     = build_email_body(summary, week_num, should_deload)
@@ -597,6 +620,8 @@ def main() -> None:
         'mode':             'first_run' if is_first_run else ('reminder' if is_reminder else 'reply_found'),
         'week_num':         week_num,
         'pdf_path':         pdf_path,
+        'html_path':        html_path,
+        'html_content':     html_content,
         'progress_summary': summary,
         'is_deload':        should_deload,
         'deload_reason':    deload_reason,

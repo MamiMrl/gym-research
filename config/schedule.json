@@ -1,0 +1,30 @@
+{
+  "week_label": "Base block — week 1",
+  "sessions": [
+    {
+      "day": "Monday",
+      "label": "Push",
+      "exercises": [
+        { "name": "Bench press",     "sets": 4, "reps": 8,  "load_kg": 80,  "note": "" },
+        { "name": "Overhead press",  "sets": 3, "reps": 10, "load_kg": 55,  "note": "" },
+        { "name": "Dips",            "sets": 3, "reps": 12, "load_kg": null, "note": "bodyweight" }
+      ]
+    },
+    {
+      "day": "Wednesday",
+      "label": "Pull",
+      "exercises": [
+        { "name": "Deadlift",        "sets": 3, "reps": 5,  "load_kg": 120, "note": "" },
+        { "name": "Barbell rows",    "sets": 4, "reps": 8,  "load_kg": 60,  "note": "" }
+      ]
+    },
+    {
+      "day": "Friday",
+      "label": "Legs",
+      "exercises": [
+        { "name": "Back squat",      "sets": 4, "reps": 6,  "load_kg": 100, "note": "" },
+        { "name": "Romanian DL",     "sets": 3, "reps": 10, "load_kg": 70,  "note": "" }
+      ]
+    }
+  ]
+}

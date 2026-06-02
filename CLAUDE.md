@@ -1,8 +1,60 @@
-# Automated Weekly Gym Progress Tracking System
+# Gym Tracking — Project Status
 
-**Project Status:** ✅ Complete & Deployed  
-**Last Updated:** May 27, 2026  
-**Deployed Routine ID:** `trig_01XUTpwZgjKkJw6VDq4HpZSh`  
+> **Two systems coexist in this directory.** Read this whole header before doing any work.
+
+## System A: Email-based tracker (OLD — still deployed)
+
+**Status:** ✅ Complete & deployed (since May 26, 2026)
+**Trigger:** Cloud routine `trig_01XUTpwZgjKkJw6VDq4HpZSh`, Sundays 08:00 Berlin
+**Code:** `weekly_gym_update.py`, `generate_workout_html.py`, `generate_workout_pdf.py`, `progress_log.json`, `routine_agent.md`
+**Flow:** Gmail reply → script parses `MON: + / WED: stay / …` → updates weights → emails next week's HTML
+**Docs:** Full algorithm + design notes below in this file (sections starting at "Executive Summary")
+
+## System B: Telegram-bot tracker (NEW — being built, 2026-06-02)
+
+**Status:** 🟡 Code complete, **not yet deployed**
+**Trigger:** GitHub Actions cron → POST `/trigger` → Telegram conversation → Submit → Claude → PDF → Resend email
+**Code:** `main.py`, `bot/`, `core/`, `config/schedule.json`, `templates/plan.html`, `Dockerfile`, `Procfile`, `railway.json`, `.github/workflows/checkin.yml`
+**Docs:** See `README.md` in this directory for the full design, env vars, and deploy steps.
+
+### What was done in the 2026-06-02 session
+
+Worked through steps 6–10 of the plan (the plan itself is in the chat log, not in the repo):
+
+- ✅ **Step 6 — PDF renderer**: `templates/plan.html` (Jinja2, A4), `core/pdf.py` (WeasyPrint). Code compiles; **local render not yet verified** because WeasyPrint needs Pango/Cairo (`brew install pango cairo gdk-pixbuf libffi`). Inside the Docker image, system libs are installed via apt.
+- ✅ **Step 7 — Email**: `core/email.py` sends base64'd PDF via Resend, reading `RESEND_API_KEY`, `RESEND_FROM`, `YOUR_EMAIL`.
+- ✅ **Step 8 — Railway deployment scaffold**: `main.py` (FastAPI + python-telegram-bot v21 webhook mode, `/`, `/webhook`, `/trigger`), full `bot/` package (`keyboards.py`, `state.py` with SQLite, `handlers.py` conversation loop), `core/prompt.py` + `core/claude_client.py` + `core/schedule.py`, `Dockerfile` (Python 3.12 slim + Pango/Cairo via apt), `Procfile`, `railway.json`, `requirements.txt` (with FastAPI + uvicorn added).
+- ✅ **Step 9 — GitHub Actions cron**: `.github/workflows/checkin.yml` — Sundays 08:00 UTC, plus `workflow_dispatch` for manual fires.
+- ✅ **Step 10 — README + sanity check**: `README.md` covers repo layout, env vars, local dev (ngrok webhook), Railway deploy, secrets, manual smoke-test. All Python modules pass `py_compile`; prompt builder verified against seeded `config/schedule.json`.
+
+### What's left to do for System B (pick up here tomorrow)
+
+1. **Get the missing API keys and put them in `.env`** (currently `.env` only has `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`):
+   - `ANTHROPIC_API_KEY` — from console.anthropic.com
+   - `RESEND_API_KEY` — sign up at resend.com (free tier is fine for one email/week)
+   - `RESEND_FROM` — must be on a verified domain in Resend (e.g. `workout@yourdomain.com`)
+   - `YOUR_EMAIL` — `hberkecelik@gmail.com`
+   - `TRIGGER_SECRET` — generate any random string (`openssl rand -hex 16`)
+2. **Optional local PDF smoke-test**: `brew install pango cairo gdk-pixbuf libffi` then `python3 -m core.pdf /tmp/plan.pdf && open /tmp/plan.pdf` — confirms the template renders before deploying.
+3. **Push to GitHub** (this repo is already a git repo with `main` branch; just commit + push). Existing uncommitted modifications: `progress_log.json`, `weekly_gym_update.py`, `.claude/settings.local.json`, plus `routine_agent.md` untracked — decide whether to bundle these into the same commit or split.
+4. **Deploy to Railway**: New project → Deploy from GitHub → set the env vars from step 1 on the service.
+5. **Register Telegram webhook** with the Railway public URL: `curl -F "url=https://<app>.up.railway.app/webhook" "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"`.
+6. **Add GitHub Actions secrets**: `BOT_TRIGGER_URL` (the `/trigger` URL on Railway) and `TRIGGER_SECRET` (same value as on Railway).
+7. **End-to-end test**: fire `workflow_dispatch` on the GitHub Action manually, or `curl -X POST .../trigger -H "Authorization: Bearer $TRIGGER_SECRET"` — expect a Telegram check-in DM, then after Submit, an email with the PDF.
+
+### Open design questions / decisions deferred
+
+- **Coexistence**: System A is still live and will fire its routine on Sunday. Decide before next Sunday whether to disable the routine `trig_01XUTpwZgjKkJw6VDq4HpZSh` so both systems don't ping you in the same week.
+- **Schedule seeding**: `config/schedule.json` was seeded with the plan's example (Push/Pull/Legs). The user's actual training (per `progress_log.json` / `personal-workout-plan.md`) is Upper/Lower over Mon/Wed/Fri/Sat. **Decide whether to migrate the real exercises into `config/schedule.json` before first deploy**, or live with the example and let Claude rewrite it from your first check-in.
+- **Resend domain**: Resend requires a verified domain for `from`. If you don't have one, use Resend's `onboarding@resend.dev` sandbox sender during testing (deliverability only to verified addresses).
+
+---
+
+# System A — Full design docs
+
+**Project Status:** ✅ Complete & Deployed
+**Last Updated:** May 27, 2026
+**Deployed Routine ID:** `trig_01XUTpwZgjKkJw6VDq4HpZSh`
 **Next Run:** Every Sunday at 8 AM Berlin time (6 AM UTC)
 
 ---

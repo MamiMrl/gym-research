@@ -9,7 +9,7 @@
 ├── README.md                  Collaborator onboarding (start here)
 ├── CLAUDE.md                  This file — status + System A design appendix
 │
-├── # System B — Telegram bot (Railway deploy target)
+├── # System B — Telegram bot (Fly.io deploy target)
 ├── main.py, requirements.txt, Dockerfile, Procfile, railway.json
 ├── bot/, core/, config/, templates/, .github/
 │
@@ -34,7 +34,7 @@
 
 ## System B: Telegram-bot tracker (NEW — being built)
 
-**Status:** 🟡 Code complete, **not yet deployed** (last touched 2026-06-03)
+**Status:** 🟡 Code complete, **deploy in progress** (last touched 2026-06-03) — Railway abandoned (credits exhausted), migrating to Fly.io
 **Trigger:** GitHub Actions cron → POST `/trigger` → Telegram conversation → Submit → LLM → PDF → Resend email
 **LLM:** `openai/gpt-oss-20b` via any OpenAI-compatible host (primary) → Groq's hosted gpt-oss-20b (fallback). See `core/llm_client.py`. Anthropic SDK was removed on 2026-06-03 in favour of the open-weight gpt-oss model.
 **Code:** `main.py`, `bot/`, `core/`, `config/schedule.json`, `templates/plan.html`, `Dockerfile`, `Procfile`, `railway.json`, `.github/workflows/checkin.yml`
@@ -56,6 +56,9 @@
 - Local PDF smoke-test passed: Homebrew Python `.venv` + WeasyPrint rendered correctly.
 - Seeded `config/schedule.json` with the real Upper/Lower routine (Mon/Wed/Fri/Sat). Weights reflect current working loads as of this date.
 - Schedule changes vs. `docs/personal-workout-plan.md` Week 1: DB Shoulder Press 15 kg, Explosive Pull-up BW+5, DB Bicep Curl 11 kg (increased from 10 kg). Hack Squat removed from Saturday, replaced with Cable Woodchop (high-to-low, 3×12/side @ 12.5 kg) for oblique work — the original plan had no rotational/anti-rotation core exercise.
+- Deployed to Railway: fixed `${PORT}` expansion bug (`railway.json` startCommand bypassed shell; removed it so Dockerfile CMD runs instead). Telegram webhook registered successfully.
+- **Railway abandoned** — free credits ($5) exhausted by repeated healthcheck retries during failed deploys. Migrating to Fly.io (free tier, always-on, Docker-native).
+- Fixed LLM JSON parsing: Groq's `json_object` response_format returned empty `failed_generation` in production. Removed `response_format` entirely; system prompt already enforces JSON output; client now strips markdown fences defensively (`core/llm_client.py`).
 
 ### What's left to do for System B
 
@@ -63,16 +66,16 @@
 
 Remaining steps before first live run:
 
-1. **Deploy to Railway**: New project → Deploy from GitHub → set all env vars on the service.
-2. **Register Telegram webhook**: `curl -F "url=https://<app>.up.railway.app/webhook" "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"`.
-3. **Add GitHub Actions secrets**: `BOT_TRIGGER_URL` (Railway public URL + `/trigger`) and `TRIGGER_SECRET` (same value as `.env`).
+1. **Deploy to Fly.io**: `brew install flyctl && flyctl auth login && flyctl launch --dockerfile Dockerfile && flyctl secrets set KEY=val ... && flyctl deploy`. See `README.md` deploy section for the full command block.
+2. **Register Telegram webhook** against the Fly.io URL: `curl -F "url=https://<app>.fly.dev/webhook" "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"`.
+3. **Update GitHub Actions secret** `BOT_TRIGGER_URL` to `https://<app>.fly.dev/trigger`.
 4. **End-to-end test**: fire `workflow_dispatch` on the Action, expect Telegram DM → after Submit, an email with the PDF to `mami.maral@icloud.com`.
 
 ### Open design questions / decisions deferred
 
 - ~~**Schedule seeding**~~ ✅ Resolved (2026-06-03): `config/schedule.json` now contains the real Upper/Lower routine. `docs/personal-workout-plan.md` is a historical reference only — `config/schedule.json` is the live source of truth and is rewritten by the LLM on every Submit.
 - ~~**Resend domain**~~ ✅ Resolved: using `onboarding@resend.dev` sandbox; delivery address `mami.maral@icloud.com` is the Resend-verified recipient.
-- **JSON mode upgrade**: `core/llm_client.py` currently uses `response_format={"type": "json_object"}`. Groq supports stricter `json_schema` mode on gpt-oss-20b which is more reliable in production — migrate if you start seeing malformed JSON. Caveats: incompatible with streaming/tool use, requires `additionalProperties: false`, all keys in `required`.
+- ~~**JSON mode upgrade**~~ ✅ Resolved differently (2026-06-03): `response_format=json_object` caused empty responses on Groq in production — removed entirely. System prompt enforces JSON; client strips fences. If malformed JSON reappears, migrate to `json_schema` strict mode (see `README.md` LLM design section).
 
 ---
 

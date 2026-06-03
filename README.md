@@ -66,7 +66,7 @@ Automated weekly gym progression tracker. The active system is **System B** (Tel
 
 ### Environment variables
 
-Set locally in `.env` and in Railway's service variables:
+Set locally in `.env` and in your hosting provider's environment variables:
 
 ```bash
 # Telegram
@@ -98,8 +98,8 @@ TRIGGER_SECRET=<random; openssl rand -hex 16>
 GitHub Actions secrets (for the cron):
 
 ```bash
-BOT_TRIGGER_URL=https://your-app.up.railway.app/trigger
-TRIGGER_SECRET=<same value as on Railway>
+BOT_TRIGGER_URL=https://<your-app>.fly.dev/trigger   # or whatever host you deploy to
+TRIGGER_SECRET=<same value as in .env>
 ```
 
 ### Local dev
@@ -128,7 +128,7 @@ python -m core.pdf /tmp/plan.pdf && open /tmp/plan.pdf
 
 If you prefer not to change your global Python setup, run the app in Docker
 instead — the Dockerfile installs the right system libs via apt and matches
-the Railway production environment exactly:
+the production environment exactly:
 
 ```bash
 docker build -t gym-research .
@@ -155,24 +155,39 @@ curl -F "url=https://<ngrok-id>.ngrok.app/webhook" \
      "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook"
 ```
 
-### Deploy to Railway
+### Deploy to Fly.io
 
-1. Push to GitHub.
-2. New Railway project → Deploy from GitHub → pick this repo. Railway detects the Dockerfile.
-3. Add every env var from the block above to the Railway service.
-4. After first deploy, copy the public URL (e.g. `https://workout.up.railway.app`).
-5. Register the Telegram webhook against that URL:
-   ```bash
-   curl -F "url=https://workout.up.railway.app/webhook" \
-        "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook"
-   ```
-6. Add `BOT_TRIGGER_URL` and `TRIGGER_SECRET` to GitHub Actions secrets.
-7. Trigger the workflow manually from the Actions tab to verify the cron path end-to-end.
+Railway was tried but exhausted its credits during initial setup. **Fly.io** is the target platform — free tier, always-on, Docker-native.
+
+```bash
+brew install flyctl
+flyctl auth login
+flyctl launch --dockerfile Dockerfile   # run from repo root; creates fly.toml
+flyctl secrets set \
+  TELEGRAM_BOT_TOKEN=... \
+  TELEGRAM_CHAT_ID=... \
+  GROQ_API_KEY=... \
+  GROQ_MODEL=openai/gpt-oss-20b \
+  TRIGGER_SECRET=... \
+  RESEND_API_KEY=... \
+  RESEND_FROM=onboarding@resend.dev \
+  YOUR_EMAIL=mami.maral@icloud.com
+flyctl deploy
+```
+
+After deploy, copy the public URL (e.g. `https://<app>.fly.dev`) and register the Telegram webhook:
+
+```bash
+curl -F "url=https://<app>.fly.dev/webhook" \
+     "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook"
+```
+
+Then add `BOT_TRIGGER_URL` (`https://<app>.fly.dev/trigger`) and `TRIGGER_SECRET` to GitHub Actions secrets, and trigger a manual `workflow_dispatch` to verify end-to-end.
 
 ### End-to-end test
 
 ```bash
-curl -X POST https://workout.up.railway.app/trigger \
+curl -X POST https://<app>.fly.dev/trigger \
      -H "Authorization: Bearer ${TRIGGER_SECRET}"
 ```
 
@@ -181,7 +196,7 @@ Expected within ~10 seconds:
 2. Tap through each exercise → **Submit**.
 3. "Generating next week's plan…" message in Telegram.
 4. Email from `RESEND_FROM` with `plan-<week>.pdf` attached.
-5. `config/schedule.json` is rewritten with the LLM's adjusted plan (on the Railway container).
+5. `config/schedule.json` is rewritten with the LLM's adjusted plan (on the server).
 
 ### Conversation flow
 
@@ -217,7 +232,7 @@ The code still supports a primary/fallback split (set `OSS_BASE_URL` + `OSS_API_
 
 **Failure surface:** any `openai.OpenAIError`, `json.JSONDecodeError`, or `ValueError` from the primary trips the fallback. If `GROQ_API_KEY` isn't set, the call raises `RuntimeError` and the bot tells you "Plan generation failed".
 
-**Upgrade path:** Groq supports strict `json_schema` mode (`response_format={"type": "json_schema", "json_schema": {...}}`) on this model, which is more reliable than the current `json_object`. Worth migrating if you start seeing malformed JSON in production. See [Groq Structured Outputs](https://console.groq.com/docs/structured-outputs) — note that strict mode is incompatible with streaming and tool use, requires `additionalProperties: false`, and all keys in `required`.
+**JSON parsing:** `response_format` was removed after Groq's `json_object` mode returned empty responses in production. The system prompt instructs JSON-only output; the client strips markdown fences defensively. If you see malformed JSON, Groq's strict `json_schema` mode is the next step — see [Groq Structured Outputs](https://console.groq.com/docs/structured-outputs) (incompatible with streaming/tool use; requires `additionalProperties: false` and all keys in `required`).
 
 ---
 
@@ -234,10 +249,12 @@ Scripts in `legacy_email/` still run locally (paths were rewritten to be relativ
 1. ☑ All env vars set in `.env` — `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GROQ_API_KEY`, `GROQ_MODEL`, `TRIGGER_SECRET`, `RESEND_API_KEY`, `RESEND_FROM` (`onboarding@resend.dev`), `YOUR_EMAIL` (`mami.maral@icloud.com`)
 2. ☑ Local PDF smoke-test passed (2026-06-03)
 3. ☑ `config/schedule.json` seeded with real Upper/Lower routine (Mon/Wed/Fri/Sat) — see `CLAUDE.md` session history for current weights
-4. ☐ Push to GitHub
-5. ☐ Deploy to Railway, set env vars
-6. ☐ Register Telegram webhook against the Railway URL
-7. ☐ Add GitHub Actions secrets (`BOT_TRIGGER_URL`, `TRIGGER_SECRET`)
-8. ☐ Fire `workflow_dispatch` manually and verify end-to-end
+4. ☑ Pushed to GitHub
+5. ☑ Railway attempted — exhausted credits during initial deploy loops; switching to Fly.io
+6. ☑ LLM JSON fix: removed `response_format=json_object` (caused empty responses on Groq); client now strips markdown fences instead
+7. ☐ Deploy to Fly.io, set secrets via `flyctl secrets set`
+8. ☐ Register Telegram webhook against the Fly.io URL
+9. ☐ Update GitHub Actions secret `BOT_TRIGGER_URL` to Fly.io URL
+10. ☐ Fire `workflow_dispatch` and verify end-to-end
 
 (System A is already retired, so there's no coexistence conflict to worry about.)

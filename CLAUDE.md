@@ -44,32 +44,34 @@
 
 **2026-06-02:** Built steps 6–10 of the original plan — PDF renderer, Resend email, FastAPI webhook server, bot conversation loop, Anthropic-backed LLM client, Dockerfile + Railway config, GitHub Actions cron, first README. All modules `py_compile`-clean. First commit (`557331e`).
 
-**2026-06-03:**
+**2026-06-03 (morning):**
 - Swapped Anthropic for OpenAI-compatible gpt-oss-20b client with Groq fallback (`core/llm_client.py` replaces `core/claude_client.py`). Verified Groq model ID `openai/gpt-oss-20b` against [Groq docs](https://console.groq.com/docs/model/openai/gpt-oss-20b).
 - Reorganized the repo root: 11 research PDFs → `docs/research/`, 5 reference markdown/HTML files → `docs/`.
 - Discovered System A's cloud routine was already auto-disabled (env lost) — **retired System A entirely**: moved source into `legacy_email/` (with hardcoded paths rewritten relative), renamed the dead routine to `(RETIRED 2026-06-03)`, replaced its prompt with a do-not-resurrect note.
 - Wired `GROQ_API_KEY` into `.env`. Primary `OSS_*` left unset — Groq is the sole LLM provider for now.
 - Rewrote `README.md` as the canonical collaborator entry point and refreshed this file.
 
+**2026-06-03 (continued):**
+- Added `RESEND_API_KEY`, `RESEND_FROM` (`onboarding@resend.dev` sandbox), and `YOUR_EMAIL` (`mami.maral@icloud.com`) to `.env`. All required env vars are now set.
+- Local PDF smoke-test passed: Homebrew Python `.venv` + WeasyPrint rendered correctly.
+- Seeded `config/schedule.json` with the real Upper/Lower routine (Mon/Wed/Fri/Sat). Weights reflect current working loads as of this date.
+- Schedule changes vs. `docs/personal-workout-plan.md` Week 1: DB Shoulder Press 15 kg, Explosive Pull-up BW+5, DB Bicep Curl 11 kg (increased from 10 kg). Hack Squat removed from Saturday, replaced with Cable Woodchop (high-to-low, 3×12/side @ 12.5 kg) for oblique work — the original plan had no rotational/anti-rotation core exercise.
+
 ### What's left to do for System B
 
-1. **Add remaining API keys to `.env`** (`GROQ_API_KEY` is already there):
-   - `RESEND_API_KEY` — from resend.com (free tier fine for one email/week)
-   - `RESEND_FROM` — must be on a verified domain in Resend
-   - `YOUR_EMAIL` — `hberkecelik@gmail.com`
-   - `TRIGGER_SECRET` — `openssl rand -hex 16`
-   - (Optional) `OSS_BASE_URL` + `OSS_API_KEY` if you later want a primary in front of the Groq fallback.
-2. **Optional local PDF smoke-test**: `brew install pango cairo gdk-pixbuf libffi` then `python3 -m core.pdf /tmp/plan.pdf && open /tmp/plan.pdf`.
-3. **Commit and push to GitHub** (uncommitted as of this update: file reorg under `legacy_email/`, `core/llm_client.py`, removed `core/claude_client.py`, doc rewrites).
-4. **Deploy to Railway**: New project → Deploy from GitHub → set env vars on the service.
-5. **Register Telegram webhook**: `curl -F "url=https://<app>.up.railway.app/webhook" "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"`.
-6. **Add GitHub Actions secrets**: `BOT_TRIGGER_URL` and `TRIGGER_SECRET`.
-7. **End-to-end test**: fire `workflow_dispatch` on the Action, expect Telegram DM → after Submit, an email with the PDF.
+**`.env` status (2026-06-03):** All required keys are set: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GROQ_API_KEY`, `GROQ_MODEL`, `TRIGGER_SECRET`, `RESEND_API_KEY`, `RESEND_FROM` (`onboarding@resend.dev`), `YOUR_EMAIL` (`mami.maral@icloud.com`). Primary `OSS_*` intentionally left unset — Groq is the sole LLM provider.
+
+Remaining steps before first live run:
+
+1. **Deploy to Railway**: New project → Deploy from GitHub → set all env vars on the service.
+2. **Register Telegram webhook**: `curl -F "url=https://<app>.up.railway.app/webhook" "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"`.
+3. **Add GitHub Actions secrets**: `BOT_TRIGGER_URL` (Railway public URL + `/trigger`) and `TRIGGER_SECRET` (same value as `.env`).
+4. **End-to-end test**: fire `workflow_dispatch` on the Action, expect Telegram DM → after Submit, an email with the PDF to `mami.maral@icloud.com`.
 
 ### Open design questions / decisions deferred
 
-- **Schedule seeding**: `config/schedule.json` was seeded with the plan's example (Push/Pull/Legs). The user's actual training (per `legacy_email/progress_log.json` / `docs/personal-workout-plan.md`) is Upper/Lower over Mon/Wed/Fri/Sat. Migrate the real exercises into `config/schedule.json` before first deploy, or let the LLM rewrite it from the first check-in.
-- **Resend domain**: Resend requires a verified domain for `from`. Use `onboarding@resend.dev` as a sandbox sender during testing (deliverability only to verified addresses).
+- ~~**Schedule seeding**~~ ✅ Resolved (2026-06-03): `config/schedule.json` now contains the real Upper/Lower routine. `docs/personal-workout-plan.md` is a historical reference only — `config/schedule.json` is the live source of truth and is rewritten by the LLM on every Submit.
+- ~~**Resend domain**~~ ✅ Resolved: using `onboarding@resend.dev` sandbox; delivery address `mami.maral@icloud.com` is the Resend-verified recipient.
 - **JSON mode upgrade**: `core/llm_client.py` currently uses `response_format={"type": "json_object"}`. Groq supports stricter `json_schema` mode on gpt-oss-20b which is more reliable in production — migrate if you start seeing malformed JSON. Caveats: incompatible with streaming/tool use, requires `additionalProperties: false`, all keys in `required`.
 
 ---

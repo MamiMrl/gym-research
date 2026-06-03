@@ -5,7 +5,20 @@
       "Skill(schedule)",
       "Skill(schedule:*)",
       "Bash(git init *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git config *)",
+      "Bash(git commit *)",
+      "Bash(gh repo *)",
+      "Bash(pip install *)",
+      "Read(//tmp/**)",
+      "Bash(brew list *)",
+      "Bash(git push *)",
+      "WebFetch(domain:console.groq.com)",
+      "WebSearch",
+      "Bash(git mv *)",
+      "Bash(mv Workout_Plan_Week_*.html legacy_outputs/)",
+      "Bash(mv Workout_Plan_Week_*.pdf legacy_outputs/)",
+      "Bash(git check-ignore *)"
     ]
   }
 }

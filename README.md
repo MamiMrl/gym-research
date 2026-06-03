@@ -104,20 +104,50 @@ TRIGGER_SECRET=<same value as on Railway>
 
 ### Local dev
 
+#### macOS — WeasyPrint system libs
+
+WeasyPrint (the PDF renderer) requires native system libraries. If you use the
+Python.org installer (`/Library/Frameworks/Python.framework/...`), macOS SIP
+strips `DYLD_*` env vars and Pango/Cairo can never be found regardless of
+whether brew has them. **Use Homebrew's Python instead:**
+
 ```bash
+brew install python@3.13 pango   # pango pulls in cairo, glib, gobject
+
+# Create a project venv backed by the Homebrew Python
+/opt/homebrew/bin/python3.13 -m venv .venv
+source .venv/bin/activate        # run this every time you open a new terminal
 pip install -r requirements.txt
+```
 
-# WeasyPrint needs system libs on macOS:
-brew install pango cairo gdk-pixbuf libffi
+Verify WeasyPrint works before going further:
 
-# Smoke-test the PDF renderer:
-python3 -m core.pdf /tmp/plan.pdf && open /tmp/plan.pdf
+```bash
+python -m core.pdf /tmp/plan.pdf && open /tmp/plan.pdf
+```
 
-# Run the web app:
+If you prefer not to change your global Python setup, run the app in Docker
+instead — the Dockerfile installs the right system libs via apt and matches
+the Railway production environment exactly:
+
+```bash
+docker build -t gym-research .
+docker run --rm -p 8000:8000 --env-file .env gym-research
+```
+
+#### Running the web app locally
+
+```bash
+source .venv/bin/activate        # if not already active
 uvicorn main:app --reload --port 8000
 ```
 
-Expose port 8000 to Telegram via ngrok:
+`main.py` reads all env vars from `.env` at startup via `load_dotenv()`. The
+minimum required keys to boot are `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
+and `TRIGGER_SECRET` — the app will crash with a `KeyError` at startup for any
+of these that are missing.
+
+Expose port 8000 to Telegram via ngrok for full bot testing:
 
 ```bash
 ngrok http 8000
@@ -201,9 +231,9 @@ Scripts in `legacy_email/` still run locally (paths were rewritten to be relativ
 
 ## Deployment checklist (System B, picking up where we left off)
 
-1. ☐ Add `OSS_BASE_URL` / `OSS_API_KEY` / `GROQ_API_KEY` / `RESEND_API_KEY` / `RESEND_FROM` / `YOUR_EMAIL` / `TRIGGER_SECRET` to `.env`
-2. ☐ (Optional) Local PDF smoke-test: `brew install pango cairo gdk-pixbuf libffi && python3 -m core.pdf /tmp/plan.pdf`
-3. ☐ Decide: migrate the real Upper/Lower routine from `progress_log.json` into `config/schedule.json`, or let the LLM rewrite it from the seeded Push/Pull/Legs example on first check-in
+1. ☑ All env vars set in `.env` — `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GROQ_API_KEY`, `GROQ_MODEL`, `TRIGGER_SECRET`, `RESEND_API_KEY`, `RESEND_FROM` (`onboarding@resend.dev`), `YOUR_EMAIL` (`mami.maral@icloud.com`)
+2. ☑ Local PDF smoke-test passed (2026-06-03)
+3. ☑ `config/schedule.json` seeded with real Upper/Lower routine (Mon/Wed/Fri/Sat) — see `CLAUDE.md` session history for current weights
 4. ☐ Push to GitHub
 5. ☐ Deploy to Railway, set env vars
 6. ☐ Register Telegram webhook against the Railway URL

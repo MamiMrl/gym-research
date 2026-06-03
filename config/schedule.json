@@ -1,29 +1,52 @@
 {
-  "week_label": "Base block — week 1",
+  "week_label": "Current block",
   "sessions": [
     {
       "day": "Monday",
-      "label": "Push",
+      "label": "Upper — Push + Pull",
       "exercises": [
-        { "name": "Bench press",     "sets": 4, "reps": 8,  "load_kg": 80,  "note": "" },
-        { "name": "Overhead press",  "sets": 3, "reps": 10, "load_kg": 55,  "note": "" },
-        { "name": "Dips",            "sets": 3, "reps": 12, "load_kg": null, "note": "bodyweight" }
+        { "name": "Wall Handstand",    "sets": 3, "reps": "30 s",  "load_kg": null, "note": "BW" },
+        { "name": "Bench Press",       "sets": 3, "reps": "6–8",   "load_kg": 70,   "note": "" },
+        { "name": "Incline DB Press",  "sets": 3, "reps": 10,      "load_kg": 22.5, "note": "per DB" },
+        { "name": "Weighted Pull-up",  "sets": 4, "reps": 6,       "load_kg": 5,    "note": "BW + belt" },
+        { "name": "DB Shoulder Press", "sets": 3, "reps": "8–10",  "load_kg": 15,   "note": "per DB" },
+        { "name": "Lateral Raise",     "sets": 3, "reps": 15,      "load_kg": 9,    "note": "per DB" }
       ]
     },
     {
       "day": "Wednesday",
-      "label": "Pull",
+      "label": "Lower — All-in",
       "exercises": [
-        { "name": "Deadlift",        "sets": 3, "reps": 5,  "load_kg": 120, "note": "" },
-        { "name": "Barbell rows",    "sets": 4, "reps": 8,  "load_kg": 60,  "note": "" }
+        { "name": "Barbell Squat",     "sets": 4, "reps": "5–6",   "load_kg": 90,   "note": "" },
+        { "name": "Leg Press",         "sets": 3, "reps": "10–12", "load_kg": 126,  "note": "" },
+        { "name": "Romanian DL",       "sets": 3, "reps": 10,      "load_kg": 75,   "note": "" },
+        { "name": "Leg Curl",          "sets": 3, "reps": "10–12", "load_kg": 45,   "note": "" },
+        { "name": "Calf Raise",        "sets": 3, "reps": 15,      "load_kg": 36,   "note": "machine" },
+        { "name": "Hanging Leg Raise", "sets": 3, "reps": 10,      "load_kg": null,  "note": "BW" }
       ]
     },
     {
       "day": "Friday",
-      "label": "Legs",
+      "label": "Cali — Shoulders + Chest",
       "exercises": [
-        { "name": "Back squat",      "sets": 4, "reps": 6,  "load_kg": 100, "note": "" },
-        { "name": "Romanian DL",     "sets": 3, "reps": 10, "load_kg": 70,  "note": "" }
+        { "name": "Explosive Pull-up",   "sets": 3, "reps": "4–5",   "load_kg": 5,    "note": "BW + belt" },
+        { "name": "Machine Chest Press", "sets": 3, "reps": 10,      "load_kg": 55,   "note": "" },
+        { "name": "Close-Grip Bench",    "sets": 3, "reps": 8,       "load_kg": 50,   "note": "" },
+        { "name": "Single-Arm DB Row",   "sets": 3, "reps": "8–10",  "load_kg": 22.5, "note": "per arm" },
+        { "name": "OH Military Press",   "sets": 3, "reps": 8,       "load_kg": 12.5, "note": "" },
+        { "name": "Pec Deck",            "sets": 3, "reps": 12,      "load_kg": 50,   "note": "limit ROM" }
+      ]
+    },
+    {
+      "day": "Saturday",
+      "label": "Deadlift — Back + Quads",
+      "exercises": [
+        { "name": "Wall Handstand",   "sets": 3, "reps": "30 s", "load_kg": null, "note": "BW" },
+        { "name": "Deadlift",         "sets": 3, "reps": "4–5",  "load_kg": 100,  "note": "" },
+        { "name": "Cable Woodchop",   "sets": 3, "reps": 12,      "load_kg": 12.5, "note": "high-to-low, per side" },
+        { "name": "Weighted Chin-up", "sets": 4, "reps": 6,      "load_kg": 5,    "note": "BW + belt" },
+        { "name": "DB Bicep Curl",    "sets": 3, "reps": 10,     "load_kg": 11,   "note": "per DB" },
+        { "name": "Weighted Plank",   "sets": 3, "reps": "60 s", "load_kg": 5,    "note": "BW + plate" }
       ]
     }
   ]

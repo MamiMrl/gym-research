@@ -49,10 +49,14 @@ def _call(client: OpenAI, model: str, user_message: str) -> dict:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_message},
         ],
-        response_format={"type": "json_object"},
     )
     raw = (resp.choices[0].message.content or "").strip()
-    return json.loads(raw)
+    # Strip markdown fences if the model wraps the JSON
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    return json.loads(raw.strip())
 
 
 def generate_plan(schedule: dict, results: dict) -> dict:

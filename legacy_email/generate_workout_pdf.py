@@ -314,13 +314,17 @@ class WorkoutPDFGenerator:
 
 if __name__ == '__main__':
     import json
-    progress_path = '/Users/neu/Downloads/gym-research/progress_log.json'
+    from pathlib import Path
+    _HERE = Path(__file__).resolve().parent
+    progress_path = str(_HERE / 'progress_log.json')
+    output_dir = _HERE / 'outputs'
+    output_dir.mkdir(exist_ok=True)
     if os.path.exists(progress_path):
         with open(progress_path) as f:
             progress = json.load(f)
         week_num = progress['meta']['current_week']
         is_deload = progress['deload']['is_deload_week']
-        output_path = f'/Users/neu/Downloads/gym-research/Workout_Plan_Week_{week_num}.pdf'
+        output_path = str(output_dir / f'Workout_Plan_Week_{week_num}.pdf')
         # Build week_data from progress exercises
         day_skills = {
             'monday':    'Chest-to-Wall Handstand (30 sec)',
@@ -341,7 +345,7 @@ if __name__ == '__main__':
     else:
         week_num = 1
         is_deload = False
-        output_path = '/Users/neu/Downloads/gym-research/Workout_Plan_Week_1.pdf'
+        output_path = str(output_dir / 'Workout_Plan_Week_1.pdf')
         week_data = WorkoutPDFGenerator._get_workout_data()
 
     generator = WorkoutPDFGenerator(output_path)

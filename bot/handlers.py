@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes
 
 from bot import state as st
 from bot.keyboards import STATUS_KEYBOARD, SKIP_NOTE_KEYBOARD, SUBMIT_KEYBOARD
-from core import claude_client, pdf
+from core import llm_client, pdf
 from core.email import send_plan_email
 from core.schedule import load_schedule, save_schedule
 
@@ -172,9 +172,9 @@ async def _on_submit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     schedule = load_schedule()
     try:
-        new_plan = claude_client.generate_plan(schedule, s["results"])
+        new_plan = llm_client.generate_plan(schedule, s["results"])
     except Exception as exc:
-        logger.exception("Claude generation failed")
+        logger.exception("LLM plan generation failed")
         await update.effective_chat.send_message(f"Plan generation failed: {exc}")
         return
 

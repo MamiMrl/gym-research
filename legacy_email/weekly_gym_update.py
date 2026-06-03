@@ -20,8 +20,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-PROGRESS_LOG = Path('/Users/neu/Downloads/gym-research/progress_log.json')
-PDF_DIR = Path('/Users/neu/Downloads/gym-research')
+_HERE = Path(__file__).resolve().parent
+PROGRESS_LOG = _HERE / 'progress_log.json'
+PDF_DIR = _HERE / 'outputs'
+PDF_DIR.mkdir(exist_ok=True)
 
 DAYS = ['MON', 'WED', 'FRI', 'SAT']
 DAY_KEY_MAP = {'MON': 'monday', 'WED': 'wednesday', 'FRI': 'friday', 'SAT': 'saturday'}
@@ -415,7 +417,7 @@ Focus on movement quality, joints, and CNS recovery.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
-    return f"""Hey Berke,
+    return f"""Hey Mami,
 
 Week {week_num} workout plan below — embedded HTML renders inline; you can also print it directly to PDF from Gmail.
 {deload_notice}

@@ -1,52 +1,76 @@
 # Gym Tracking — Project Status
 
-> **Two systems coexist in this directory.** Read this whole header before doing any work.
+> Read this header and `README.md` before doing any work. `README.md` is the canonical onboarding doc for collaborators; this file is the deeper status log + System A design appendix.
 
-## System A: Email-based tracker (OLD — still deployed)
+## Directory layout (refreshed 2026-06-03)
 
-**Status:** ✅ Complete & deployed (since May 26, 2026)
-**Trigger:** Cloud routine `trig_01XUTpwZgjKkJw6VDq4HpZSh`, Sundays 08:00 Berlin
-**Code:** `weekly_gym_update.py`, `generate_workout_html.py`, `generate_workout_pdf.py`, `progress_log.json`, `routine_agent.md`
-**Flow:** Gmail reply → script parses `MON: + / WED: stay / …` → updates weights → emails next week's HTML
-**Docs:** Full algorithm + design notes below in this file (sections starting at "Executive Summary")
+```
+.
+├── README.md                  Collaborator onboarding (start here)
+├── CLAUDE.md                  This file — status + System A design appendix
+│
+├── # System B — Telegram bot (Railway deploy target)
+├── main.py, requirements.txt, Dockerfile, Procfile, railway.json
+├── bot/, core/, config/, templates/, .github/
+│
+├── legacy_email/              System A — retired 2026-06-03, archived for reference
+│   ├── README.md              Retirement note + how it worked
+│   ├── weekly_gym_update.py, generate_workout_html.py, generate_workout_pdf.py
+│   ├── progress_log.json, routine_agent.md
+│   └── outputs/               Generated HTML/PDF (gitignored)
+│
+└── docs/                      Training plans + scientific references
+    ├── personal-workout-plan.{md,html,pdf}
+    ├── Gym-planning.md, golden-encyklopedia-building-muscle.md, injury-recovery.md
+    └── research/              Source PDFs (gitignored)
+```
 
-## System B: Telegram-bot tracker (NEW — being built, 2026-06-02)
+## System A: Email-based tracker (RETIRED 2026-06-03)
 
-**Status:** 🟡 Code complete, **not yet deployed**
-**Trigger:** GitHub Actions cron → POST `/trigger` → Telegram conversation → Submit → Claude → PDF → Resend email
+**Status:** ☠ Retired. Routine `trig_01XUTpwZgjKkJw6VDq4HpZSh` is permanently disabled (renamed `Weekly Gym Progress Update (RETIRED 2026-06-03)`; its original Mac Bridge environment was lost on 2026-05-31, and we superseded it with System B rather than rebuilding).
+**Code:** moved to `legacy_email/`, hardcoded `/Users/neu/Downloads/gym-research/` paths rewritten to be relative to the folder so the scripts still run locally.
+**Flow (historical):** Gmail reply → script parses `MON: + / WED: stay / …` → updates weights → emails next week's HTML
+**Docs:** `legacy_email/README.md` for the retirement context; full algorithm + design notes below in this file (sections starting at "Executive Summary").
+
+## System B: Telegram-bot tracker (NEW — being built)
+
+**Status:** 🟡 Code complete, **not yet deployed** (last touched 2026-06-03)
+**Trigger:** GitHub Actions cron → POST `/trigger` → Telegram conversation → Submit → LLM → PDF → Resend email
+**LLM:** `openai/gpt-oss-20b` via any OpenAI-compatible host (primary) → Groq's hosted gpt-oss-20b (fallback). See `core/llm_client.py`. Anthropic SDK was removed on 2026-06-03 in favour of the open-weight gpt-oss model.
 **Code:** `main.py`, `bot/`, `core/`, `config/schedule.json`, `templates/plan.html`, `Dockerfile`, `Procfile`, `railway.json`, `.github/workflows/checkin.yml`
-**Docs:** See `README.md` in this directory for the full design, env vars, and deploy steps.
+**Docs:** See `README.md` for env vars, deploy steps, conversation flow, and LLM fallback notes.
 
-### What was done in the 2026-06-02 session
+### Session history
 
-Worked through steps 6–10 of the plan (the plan itself is in the chat log, not in the repo):
+**2026-06-02:** Built steps 6–10 of the original plan — PDF renderer, Resend email, FastAPI webhook server, bot conversation loop, Anthropic-backed LLM client, Dockerfile + Railway config, GitHub Actions cron, first README. All modules `py_compile`-clean. First commit (`557331e`).
 
-- ✅ **Step 6 — PDF renderer**: `templates/plan.html` (Jinja2, A4), `core/pdf.py` (WeasyPrint). Code compiles; **local render not yet verified** because WeasyPrint needs Pango/Cairo (`brew install pango cairo gdk-pixbuf libffi`). Inside the Docker image, system libs are installed via apt.
-- ✅ **Step 7 — Email**: `core/email.py` sends base64'd PDF via Resend, reading `RESEND_API_KEY`, `RESEND_FROM`, `YOUR_EMAIL`.
-- ✅ **Step 8 — Railway deployment scaffold**: `main.py` (FastAPI + python-telegram-bot v21 webhook mode, `/`, `/webhook`, `/trigger`), full `bot/` package (`keyboards.py`, `state.py` with SQLite, `handlers.py` conversation loop), `core/prompt.py` + `core/claude_client.py` + `core/schedule.py`, `Dockerfile` (Python 3.12 slim + Pango/Cairo via apt), `Procfile`, `railway.json`, `requirements.txt` (with FastAPI + uvicorn added).
-- ✅ **Step 9 — GitHub Actions cron**: `.github/workflows/checkin.yml` — Sundays 08:00 UTC, plus `workflow_dispatch` for manual fires.
-- ✅ **Step 10 — README + sanity check**: `README.md` covers repo layout, env vars, local dev (ngrok webhook), Railway deploy, secrets, manual smoke-test. All Python modules pass `py_compile`; prompt builder verified against seeded `config/schedule.json`.
+**2026-06-03:**
+- Swapped Anthropic for OpenAI-compatible gpt-oss-20b client with Groq fallback (`core/llm_client.py` replaces `core/claude_client.py`). Verified Groq model ID `openai/gpt-oss-20b` against [Groq docs](https://console.groq.com/docs/model/openai/gpt-oss-20b).
+- Reorganized the repo root: 11 research PDFs → `docs/research/`, 5 reference markdown/HTML files → `docs/`.
+- Discovered System A's cloud routine was already auto-disabled (env lost) — **retired System A entirely**: moved source into `legacy_email/` (with hardcoded paths rewritten relative), renamed the dead routine to `(RETIRED 2026-06-03)`, replaced its prompt with a do-not-resurrect note.
+- Wired `GROQ_API_KEY` into `.env`. Primary `OSS_*` left unset — Groq is the sole LLM provider for now.
+- Rewrote `README.md` as the canonical collaborator entry point and refreshed this file.
 
-### What's left to do for System B (pick up here tomorrow)
+### What's left to do for System B
 
-1. **Get the missing API keys and put them in `.env`** (currently `.env` only has `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`):
-   - `ANTHROPIC_API_KEY` — from console.anthropic.com
-   - `RESEND_API_KEY` — sign up at resend.com (free tier is fine for one email/week)
-   - `RESEND_FROM` — must be on a verified domain in Resend (e.g. `workout@yourdomain.com`)
+1. **Add remaining API keys to `.env`** (`GROQ_API_KEY` is already there):
+   - `RESEND_API_KEY` — from resend.com (free tier fine for one email/week)
+   - `RESEND_FROM` — must be on a verified domain in Resend
    - `YOUR_EMAIL` — `hberkecelik@gmail.com`
-   - `TRIGGER_SECRET` — generate any random string (`openssl rand -hex 16`)
-2. **Optional local PDF smoke-test**: `brew install pango cairo gdk-pixbuf libffi` then `python3 -m core.pdf /tmp/plan.pdf && open /tmp/plan.pdf` — confirms the template renders before deploying.
-3. **Push to GitHub** (this repo is already a git repo with `main` branch; just commit + push). Existing uncommitted modifications: `progress_log.json`, `weekly_gym_update.py`, `.claude/settings.local.json`, plus `routine_agent.md` untracked — decide whether to bundle these into the same commit or split.
-4. **Deploy to Railway**: New project → Deploy from GitHub → set the env vars from step 1 on the service.
-5. **Register Telegram webhook** with the Railway public URL: `curl -F "url=https://<app>.up.railway.app/webhook" "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"`.
-6. **Add GitHub Actions secrets**: `BOT_TRIGGER_URL` (the `/trigger` URL on Railway) and `TRIGGER_SECRET` (same value as on Railway).
-7. **End-to-end test**: fire `workflow_dispatch` on the GitHub Action manually, or `curl -X POST .../trigger -H "Authorization: Bearer $TRIGGER_SECRET"` — expect a Telegram check-in DM, then after Submit, an email with the PDF.
+   - `TRIGGER_SECRET` — `openssl rand -hex 16`
+   - (Optional) `OSS_BASE_URL` + `OSS_API_KEY` if you later want a primary in front of the Groq fallback.
+2. **Optional local PDF smoke-test**: `brew install pango cairo gdk-pixbuf libffi` then `python3 -m core.pdf /tmp/plan.pdf && open /tmp/plan.pdf`.
+3. **Commit and push to GitHub** (uncommitted as of this update: file reorg under `legacy_email/`, `core/llm_client.py`, removed `core/claude_client.py`, doc rewrites).
+4. **Deploy to Railway**: New project → Deploy from GitHub → set env vars on the service.
+5. **Register Telegram webhook**: `curl -F "url=https://<app>.up.railway.app/webhook" "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"`.
+6. **Add GitHub Actions secrets**: `BOT_TRIGGER_URL` and `TRIGGER_SECRET`.
+7. **End-to-end test**: fire `workflow_dispatch` on the Action, expect Telegram DM → after Submit, an email with the PDF.
 
 ### Open design questions / decisions deferred
 
-- **Coexistence**: System A is still live and will fire its routine on Sunday. Decide before next Sunday whether to disable the routine `trig_01XUTpwZgjKkJw6VDq4HpZSh` so both systems don't ping you in the same week.
-- **Schedule seeding**: `config/schedule.json` was seeded with the plan's example (Push/Pull/Legs). The user's actual training (per `progress_log.json` / `personal-workout-plan.md`) is Upper/Lower over Mon/Wed/Fri/Sat. **Decide whether to migrate the real exercises into `config/schedule.json` before first deploy**, or live with the example and let Claude rewrite it from your first check-in.
-- **Resend domain**: Resend requires a verified domain for `from`. If you don't have one, use Resend's `onboarding@resend.dev` sandbox sender during testing (deliverability only to verified addresses).
+- **Schedule seeding**: `config/schedule.json` was seeded with the plan's example (Push/Pull/Legs). The user's actual training (per `legacy_email/progress_log.json` / `docs/personal-workout-plan.md`) is Upper/Lower over Mon/Wed/Fri/Sat. Migrate the real exercises into `config/schedule.json` before first deploy, or let the LLM rewrite it from the first check-in.
+- **Resend domain**: Resend requires a verified domain for `from`. Use `onboarding@resend.dev` as a sandbox sender during testing (deliverability only to verified addresses).
+- **JSON mode upgrade**: `core/llm_client.py` currently uses `response_format={"type": "json_object"}`. Groq supports stricter `json_schema` mode on gpt-oss-20b which is more reliable in production — migrate if you start seeing malformed JSON. Caveats: incompatible with streaming/tool use, requires `additionalProperties: false`, all keys in `required`.
 
 ---
 
@@ -94,7 +118,7 @@ This is a fully automated system that manages weekly gym training progression th
            │             (via generate_workout_html.py — BVB dark theme)
            │
            └─ Sends: Email with new HTML link + reply template
-              To: hberkecelik@gmail.com
+              To: muhammed.maral99@gmail.com
 
 ┌─────────────────────────────────────────────────────────────────┐
 │  Local Files (on your Mac in gym-research/)                     │
@@ -112,6 +136,7 @@ This is a fully automated system that manages weekly gym training progression th
 ## How It Works: Step-by-Step
 
 ### Week 1 (First Run)
+
 ```
 Sunday 8 AM → Routine checks status → "is_first_run: true"
          ↓
@@ -125,6 +150,7 @@ You: Do your 4 workouts (Mon, Wed, Fri, Sat) — same exercises every week
 ```
 
 ### Week 2+ (Ongoing)
+
 ```
 Sunday 8 AM → Routine checks Gmail for your reply
          ↓
@@ -153,6 +179,7 @@ Loop repeats next Sunday
 **KEY DESIGN:** Exercise structure stays identical week-to-week. This allows you to track progress on the same movements and compare performance across weeks without confusion from changing exercises.
 
 ### When Deload Triggers
+
 ```
 Week 8: You hit 6 consecutive weeks of "+", OR
         Your comment has "joint pain", OR
@@ -177,6 +204,7 @@ After deload week, normal progression resumes
 **What it does:** Parses replies, updates weights, detects deload, generates JSON output for email.
 
 **Public interface (CLI):**
+
 ```bash
 # First-time setup
 python3 weekly_gym_update.py init
@@ -201,18 +229,19 @@ python3 weekly_gym_update.py process --no-reply
 
 **Key functions:**
 
-| Function | Purpose |
-|----------|---------|
-| `parse_reply(email_body)` | Extract MON/WED/FRI/SAT ±/stay from email text |
-| `update_weights(progress, parsed_reply)` | Apply weight changes (+2.5kg compounds, +1kg isolation) |
-| `detect_deload(progress, parsed_reply)` | Check: 6 weeks? Stall? Fatigue keywords? Decline? |
-| `update_fatigue_counters()` | Track consecutive progression/decline/no-progress weeks |
-| `apply_deload_to_progress()` | Set `is_deload_week=True`, log deload reason |
-| `build_week_data()` | Convert JSON exercises → PDF-ready dict (applies set reductions if deload) |
-| `generate_pdf()` | Call `generate_workout_pdf.py` with week data |
-| `build_progress_summary()` | Create human-readable recap for email |
+| Function                                 | Purpose                                                                    |
+| ---------------------------------------- | -------------------------------------------------------------------------- |
+| `parse_reply(email_body)`                | Extract MON/WED/FRI/SAT ±/stay from email text                             |
+| `update_weights(progress, parsed_reply)` | Apply weight changes (+2.5kg compounds, +1kg isolation)                    |
+| `detect_deload(progress, parsed_reply)`  | Check: 6 weeks? Stall? Fatigue keywords? Decline?                          |
+| `update_fatigue_counters()`              | Track consecutive progression/decline/no-progress weeks                    |
+| `apply_deload_to_progress()`             | Set `is_deload_week=True`, log deload reason                               |
+| `build_week_data()`                      | Convert JSON exercises → PDF-ready dict (applies set reductions if deload) |
+| `generate_pdf()`                         | Call `generate_workout_pdf.py` with week data                              |
+| `build_progress_summary()`               | Create human-readable recap for email                                      |
 
 **Weight type handling:**
+
 ```python
 WEIGHT_INCREMENTS = {
     'barbell':      2.5,      # "70 kg" → 72.5 kg
@@ -226,6 +255,7 @@ WEIGHT_INCREMENTS = {
 ```
 
 **Example: How weight updates work**
+
 ```python
 # User replied: "MON: +"
 # Bench Press: weight="70 kg", weight_kg=70.0, weight_type="barbell"
@@ -244,12 +274,14 @@ ex['history'].append({'week': 2, 'weight': '72.5 kg', 'weight_kg': 72.5, 'action
 **What changed:** Originally hardcoded Week 1 data. Now accepts external data.
 
 **Original call:**
+
 ```python
 generator = WorkoutPDFGenerator(output_path)
 generator.build_pdf()  # Hardcoded week_data
 ```
 
 **New call (from weekly_gym_update.py):**
+
 ```python
 week_data = build_week_data(progress, is_deload=True)  # From JSON
 generator = WorkoutPDFGenerator(output_path)
@@ -257,6 +289,7 @@ generator.build_pdf(week_data=week_data, week_num=8, is_deload=True)
 ```
 
 **Title handling:**
+
 ```python
 # Old: title = 'Week 1 — Upper/Lower Split'
 # New:
@@ -267,6 +300,7 @@ if is_deload:
 ```
 
 **Set reductions during deload:**
+
 ```python
 def build_week_data(progress, is_deload=False):
     # ...
@@ -281,6 +315,7 @@ def build_week_data(progress, is_deload=False):
 ### 3. `progress_log.json` — The Database
 
 **Structure (simplified):**
+
 ```json
 {
   "meta": {
@@ -353,6 +388,7 @@ def build_week_data(progress, is_deload=False):
 ```
 
 **Key insight:** Each exercise stores BOTH `weight` (display string, e.g., "70 kg") and `weight_kg` (numeric, e.g., 70.0). This separates concerns:
+
 - `weight_kg` used for calculations (+/- increments)
 - `weight` used for PDF display and user communication
 - `weight_type` used to look up the correct increment
@@ -364,31 +400,38 @@ def build_week_data(progress, is_deload=False):
 ### The Five Deload Triggers
 
 **1. Hard cap: 6 consecutive progression weeks**
+
 ```python
 if deload_info['consecutive_progression_weeks'] >= 6:
     return True, "6 consecutive weeks of progression — scheduled deload"
 ```
+
 - Why 6? Your Gym-planning.md says 4-8 weeks; research (Schoenfeld) says 8 weeks approaches overreaching; 6 is midpoint
 - Resets after deload week
 
 **2. Stall: 3+ consecutive weeks with zero progression**
+
 ```python
 if fatigue['consecutive_no_progress_weeks'] >= 3:
     return True, "3 consecutive weeks with no progression"
 ```
+
 - Triggered when a week has zero `+` responses across all 4 days
 - Indicates adaptation plateau
 
 **3. Decline: 2+ consecutive weeks of minus on same day**
+
 ```python
 for day, count in fatigue['days_consecutive_decline'].items():
     if count >= 2:
         return True, f"2 consecutive weeks of decline on {day}"
 ```
+
 - Tracks per-day decline (MON, WED, FRI, SAT separately)
 - Two `-` responses in a row on same day = warning signal
 
 **4. Fatigue keywords in comments**
+
 ```python
 FATIGUE_KEYWORDS = [
     (r'joint pain', 'joint pain'),    # Explicit from your docs
@@ -409,10 +452,12 @@ for pattern, display in FATIGUE_KEYWORDS:
     if re.search(pattern, all_comments):
         return True, f"Fatigue signal: {display}"
 ```
+
 - Uses regex word boundaries to avoid "deadlift" matching `\bdead\b`
 - Catches muscle damage signals (DOMS), CNS fatigue ("no energy"), joint stress
 
 **5. No explicit trigger, but conditions met?**
+
 ```python
 # Falls through to: return False, None
 # Next Sunday, counters increment and may trigger then
@@ -452,6 +497,7 @@ if deload_triggered:
     deload_info['last_deload_date'] = date.today().isoformat()
     deload_info['deload_count_total'] += 1
 ```
+
 - All counters reset to zero after deload
 - Lets you build up progression again from scratch
 - Tracks total deloads for history
@@ -464,8 +510,9 @@ if deload_triggered:
 
 **Subject:** `Week 1 Gym Plan — Upper/Lower Split`  
 **Body:**
+
 ```
-Hey Berke,
+Hey Mami,
 
 Week 1 workout plan attached — print it or open on your phone.
 
@@ -504,6 +551,7 @@ Train hard.
 ### What You Send Back (Week 2+)
 
 **Reply to the email:**
+
 ```
 MON: + | Bench was great, hit a 77.5kg PR
 WED: stay | Quads still sore from last week
@@ -517,6 +565,7 @@ The routine reads this, parses it, and updates next week's PDF.
 
 **Subject:** `Week 8 Gym Plan — DELOAD WEEK`  
 **Body includes:**
+
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DELOAD WEEK — Your body needs this.
@@ -540,31 +589,37 @@ Same weights, ~50% sets, 3-4 RIR. Let joints and CNS recover.
 ### Where the Algorithm Comes From
 
 **Deload Frequency (Every 4-8 weeks):**
+
 - Source: Gym-planning.md (YOUR OWN PLAN)
 - Science basis: Schoenfeld et al. (2016) — "scheduling regular periods of reduced training frequencies every few weeks (deloading)"
 
 **6-Week Hard Cap:**
+
 - YOUR PLAN: 4-8 weeks
 - SCIENCE: Schoenfeld et al. (2018) — 8 weeks at high volume (30-45 sets/week) approaches non-functional overreaching
 - LOGIC: 6 weeks = midpoint, safer upper bound
 
 **Weight Increments (2.5 kg compounds, 1 kg isolation):**
+
 - YOUR PLAN: "+1 rep on top set OR +2.5 kg" progression rule
 - SCIENCE: Grgic et al. (2018) — 6+ sets/week per muscle minimum for strength
 - Your split: 2x/week per muscle, so ~12-20 sets/week optimal
 
 **Deload Protocol (Same weights, 50-60% volume):**
+
 - YOUR PLAN: "Deload: every 4–8 weeks, 50–60% volume"
 - "Intensity (weights): same — keep the same loads"
 - "More RIR (reps in reserve)"
 - SCIENCE: Schoenfeld et al. (2017) — Low-load training (≤60% 1RM, 20-30 reps) doesn't sacrifice hypertrophy
 
 **Stall Definition (2-3 weeks no progress):**
+
 - YOUR PLAN: "cannot add reps or sets for 2–3 weeks"
 - SCIENCE: Schoenfeld et al. (2017) — Minimum 6-week training block needed to assess progress meaningfully
 - LOGIC: At 3 weeks with no progress, deload is likely needed
 
 **Fatigue Keywords (tiredness, joint pain, soreness):**
+
 - Dupuy et al. (2018) — DOMS normally resolves 24-72h; prolonged DOMS + elevated perceived fatigue = incomplete recovery
 - Coffey & Hawley (2017) — Accumulated fatigue mechanisms degrade performance
 - YOUR PLAN: "Joint pain → drop load, run isometric protocol"
@@ -574,6 +629,7 @@ Same weights, ~50% sets, 3-4 RIR. Let joints and CNS recover.
 ## How to Use This System
 
 ### For Regular Use
+
 ```bash
 # Every Sunday, you receive an email at 8 AM Berlin time
 # 1. Read the email
@@ -588,6 +644,7 @@ Same weights, ~50% sets, 3-4 RIR. Let joints and CNS recover.
 ```
 
 ### For Manual Testing
+
 ```bash
 cd /Users/neu/Downloads/gym-research
 
@@ -647,7 +704,9 @@ with open('progress_log.json') as f:
 ## Troubleshooting Guide
 
 ### Issue: "Weights not updating"
+
 **Check:**
+
 1. Did you reply to the email with the correct format?
    ```
    ✓ MON: + | Great session
@@ -658,19 +717,23 @@ with open('progress_log.json') as f:
 3. Is `last_email_sent_date` in progress_log.json set to the date you sent the email?
 
 **Fix:** Manually test the script:
+
 ```bash
 python3 weekly_gym_update.py process --reply "MON: + | Test"
 # Check if it outputs is_deload: false, new weights in JSON
 ```
 
 ### Issue: "Deload triggered unexpectedly"
+
 **Check `progress_log.json`:**
+
 - `consecutive_progression_weeks` = 6? (Hard cap)
 - `consecutive_no_progress_weeks` = 3+? (Stall)
 - Check `fatigue_tracking.days_consecutive_decline` = 2+ on any day? (Decline)
 - Check the email you sent — did it contain a fatigue keyword?
 
 **Fatigue keywords that trigger deload:**
+
 - "joint pain", "joint ache"
 - "tired", "exhausted", "pain", "hurt"
 - "no energy", "couldn't", "dead", "burned out", "struggling", "wrecked"
@@ -681,13 +744,16 @@ python3 weekly_gym_update.py process --reply "MON: + | Test"
 **Fix:** Review your comment in the email — did you use any of these words?
 
 ### Issue: "PDF not generating"
+
 **Check:**
-1. Does `/Users/neu/Downloads/gym-research/Workout_Plan_Week_N.pdf` exist?
+
+1. Does `/Users/neu/Downloads/gym-research/legacy_outputs/Workout_Plan_Week_N.pdf` exist?
 2. Are both files present and unmodified?
    - `generate_workout_pdf.py` (with build_pdf signature change)
    - `progress_log.json` (created by `init` command)
 
 **Fix:** Manually test PDF generation:
+
 ```bash
 python3 generate_workout_pdf.py
 # Should create Workout_Plan_Week_1.pdf (or current week)
@@ -695,12 +761,15 @@ python3 generate_workout_pdf.py
 ```
 
 ### Issue: "Routine not running on Sunday"
+
 **Check:**
+
 1. Is the routine enabled? Visit: https://claude.ai/code/routines/trig_01XUTpwZgjKkJw6VDq4HpZSh
 2. Is "Next run at" showing future date?
 3. Does it show "Status: Enabled"?
 
 **Fix:** If disabled, re-enable from the URL above. If more than 1 week past next run date, manually trigger:
+
 ```bash
 # Contact support or trigger manually:
 python3 weekly_gym_update.py process
@@ -735,52 +804,53 @@ python3 weekly_gym_update.py process
 │   ├── Stores: Exercises, weights, history, deload flags
 │   └── Never edit manually (use the script)
 │
-├── Workout_Plan_Week_1.html .................. Generated HTMLs
-├── Workout_Plan_Week_2.html
-├── Workout_Plan_Week_N.html
-│   └── Beautiful dark theme, landscape A4, print-to-PDF ready
+├── legacy_outputs/ ............................ Generated HTMLs + PDFs (gitignored)
+│   └── Workout_Plan_Week_N.{html,pdf} ......... Beautiful dark theme, landscape A4
 │
-├── personal-workout-plan.md .................. Your training plan (reference)
-├── Gym-planning.md ............................ Programming theory (reference)
-├── golden-encyklopedia-building-muscle.md ... Your notes (reference)
-├── injury-recovery.md ......................... Shoulder protocol (reference)
-│
-└── [Research PDFs] ........................... Scientific basis for algorithm
-    ├── Resistance Training Frequency Review.pdf
-    ├── Resistance Training Volume Enhances Muscle Hypertrophy.pdf
-    ├── Post-exercise Recovery Techniques Review 2018.pdf
-    └── ... (14 PDFs total)
+└── docs/ ...................................... Training plans + research (reference)
+    ├── personal-workout-plan.{md,html,pdf} .... Your training plan
+    ├── Gym-planning.md ........................ Programming theory
+    ├── golden-encyklopedia-building-muscle.md . Your notes
+    ├── injury-recovery.md ..................... Shoulder protocol
+    └── research/ .............................. Scientific PDFs (gitignored)
+        └── *.pdf (10+ files — Schoenfeld, Grgic, Dupuy, etc.)
 ```
+
+> **Note:** System B (Telegram bot) lives at the repo root alongside System A. See the directory layout at the top of this file or `README.md` for the full picture.
 
 ---
 
 ## Design Philosophy
 
 ### Exercise Structure (MAY 27, 2026 UPDATE)
+
 ✅ **Consistent week-to-week**: Same exercises every week (Mon/Wed/Fri/Sat never change)  
 ✅ **Weights only adjust**: Only load changes based on your feedback, not exercise selection  
 ✅ **Clean analysis**: Easier to track progress on same movements across multiple weeks  
-✅ **Stable routine**: Reduces confusion from constantly changing exercises  
+✅ **Stable routine**: Reduces confusion from constantly changing exercises
 
 ### Visual Design (MAY 27, 2026 UPDATE)
+
 ✅ **HTML with BVB theme**: Beautiful dark theme (black + yellow) inspired by Borussia Dortmund  
 ✅ **Browser-friendly**: Open in browser, print to PDF for professional output  
 ✅ **Responsive layout**: 2-column day cards, landscape A4 format  
-✅ **Typography**: Bebas Neue (headings), Inter (body), JetBrains Mono (technical)  
+✅ **Typography**: Bebas Neue (headings), Inter (body), JetBrains Mono (technical)
 
 ---
 
 ## Maintenance & Future Enhancements
 
 ### Current Capabilities
+
 ✅ Weekly email-based progress tracking  
 ✅ Automatic weight adjustments (+2.5 kg compounds, +1 kg isolation)  
 ✅ Science-backed deload detection (6+ weeks, stalls, fatigue)  
 ✅ Complete training history (every exercise, every week)  
 ✅ Beautiful HTML workouts with BVB dark theme (printable to PDF)  
-✅ No manual intervention needed (fully automated)  
+✅ No manual intervention needed (fully automated)
 
 ### Potential Improvements
+
 - [ ] Multi-week progression trends (chart your gains)
 - [ ] Custom fatigue thresholds per muscle group
 - [ ] Soft deloads (first trigger = more RIR, second trigger = reduced volume)
@@ -802,7 +872,7 @@ python3 weekly_gym_update.py process
 **Model:** Claude Sonnet 4.6  
 **MCP Connections:** Gmail (read & send emails)  
 **Allowed Tools:** Bash, Read, Write, Edit, Glob, Grep  
-**Status:** ✅ Enabled  
+**Status:** ✅ Enabled
 
 **Manage at:** https://claude.ai/code/routines/trig_01XUTpwZgjKkJw6VDq4HpZSh
 
@@ -823,6 +893,6 @@ If issues arise, check the **Troubleshooting Guide** above.
 **System Status:** ✅ Production Ready  
 **Last Tested:** May 27, 2026  
 **Deployed:** May 26, 2026  
-**User Email:** hberkecelik@gmail.com  
+**User Email:** muhammed.maral99@gmail.com  
 **User Timezone:** Europe/Berlin  
 **User Stats:** 79 kg, 26 years old, 10+ years training experience

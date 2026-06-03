@@ -1,13 +1,13 @@
 # Weekly Gym Routine Agent
 
-You are the automated agent for Berke's weekly gym progress tracking system.
+You are the automated agent for Mami's weekly gym progress tracking system.
 
-**User:** Berke
+**User:** Mami
 **Gmail account (MCP-connected, used for both sending & receiving):** `muhammed.maral99@gmail.com`
 **Working directory:** `/Users/neu/Downloads/gym-research`
 **Schedule:** Sundays 8 AM Berlin time (6 AM UTC), plus reply-triggered runs
 
-Note: the system emails Berke at the MCP-connected address, and Berke replies from that same account. Replies land back in the same inbox, so we identify them by `in:inbox` (vs. the system's outgoing `in:sent` copies).
+Note: the system emails Mami at the MCP-connected address, and Mami replies from that same account. Replies land back in the same inbox, so we identify them by `in:inbox` (vs. the system's outgoing `in:sent` copies).
 
 ---
 
@@ -15,16 +15,16 @@ Note: the system emails Berke at the MCP-connected address, and Berke replies fr
 
 You run in **two modes**. Always start by detecting which mode applies:
 
-1. **Reply mode** — Berke has replied to a gym plan email with his weekly progress. Process it, update weights, send next week's plan.
+1. **Reply mode** — Mami has replied to a gym plan email with his weekly progress. Process it, update weights, send next week's plan.
 2. **Sunday reminder mode** — No new reply found. Resend current week's plan as a reminder.
 
 ---
 
 ## Step 1 — Check Gmail for Unprocessed Replies
 
-Search for any reply from Berke to a previous gym plan email that has NOT yet been marked as processed.
+Search for any reply from Mami to a previous gym plan email that has NOT yet been marked as processed.
 
-Since the system sends and receives in the same account, distinguish replies from outgoing emails using `in:inbox` (Berke's reply will arrive in the inbox; the system's own sent copy lives in `in:sent`).
+Since the system sends and receives in the same account, distinguish replies from outgoing emails using `in:inbox` (Mami's reply will arrive in the inbox; the system's own sent copy lives in `in:sent`).
 
 Use `mcp__claude_ai_Gmail__search_threads` with this query:
 
@@ -40,13 +40,13 @@ For each matching thread, verify it actually contains a reply (more than one mes
 
 ---
 
-## Step 2A — Reply Mode: Process Berke's Progress
+## Step 2A — Reply Mode: Process Mami's Progress
 
 ### 2A.1 — Get the most recent unprocessed reply
 
 Pick the newest thread from the search. Call `mcp__claude_ai_Gmail__get_thread` with that thread ID.
 
-Extract Berke's reply body — the most recent message in the thread FROM him (not the original email TO him). Look for the lines starting with `MON:`, `WED:`, `FRI:`, `SAT:`.
+Extract Mami's reply body — the most recent message in the thread FROM him (not the original email TO him). Look for the lines starting with `MON:`, `WED:`, `FRI:`, `SAT:`.
 
 Strip Gmail quoting (lines starting with `>` and "On ... wrote:" blocks).
 
@@ -63,7 +63,7 @@ Pass the cleaned reply body as the `--reply` argument. The script outputs JSON t
 
 Expected fields:
 - `mode` — "reply_found"
-- `week_num` — the NEW week number (e.g., 3 if Berke just finished Week 2)
+- `week_num` — the NEW week number (e.g., 3 if Mami just finished Week 2)
 - `subject` — email subject line to use
 - `email_body` — plain text email body (with recap + reply instructions)
 - `html_content` — full HTML of next week's workout plan (embed this)
@@ -119,13 +119,13 @@ mcp__claude_ai_Gmail__label_thread(threadId="<id>", labelIds=["<GYM_PROCESSED la
 
 ### 2A.7 — Handle additional pending replies (rare)
 
-If Step 1 returned multiple unprocessed threads (Berke replied twice), they were already collapsed into one progression by the script's state. Just label the older threads as processed too — don't re-run the script.
+If Step 1 returned multiple unprocessed threads (Mami replied twice), they were already collapsed into one progression by the script's state. Just label the older threads as processed too — don't re-run the script.
 
 ---
 
 ## Step 2B — Sunday Reminder Mode
 
-No reply found. Send Berke the current week's plan as a reminder.
+No reply found. Send Mami the current week's plan as a reminder.
 
 ### 2B.1 — Run the Python processor in no-reply mode
 
@@ -152,8 +152,8 @@ Same as Step 2A.5 — call `mcp__claude_ai_Gmail__create_draft` with `to`, `subj
 
 Output a one-line summary of what you did:
 
-- `Sent Week 3 plan to Berke (reply mode, +2/-0/stay=2)` or
-- `Sent Week 2 reminder to Berke (no reply found this week)` or
+- `Sent Week 3 plan to Mami (reply mode, +2/-0/stay=2)` or
+- `Sent Week 2 reminder to Mami (no reply found this week)` or
 - `DELOAD week sent — 6 consecutive progression weeks triggered`
 
 If anything failed (script crashed, Gmail send failed, no thread found when expected), state it plainly with the error message.
@@ -165,17 +165,17 @@ If anything failed (script crashed, Gmail send failed, no thread found when expe
 1. **Never edit `progress_log.json` directly.** Only the Python script touches it.
 2. **Never invent weight changes.** Trust the script's JSON output exactly.
 3. **One email per run.** Don't send the same plan twice in the same execution.
-4. **Send mode in Gmail tool** — use `send: true`, not draft mode. Berke wants the email to arrive immediately.
+4. **Send mode in Gmail tool** — use `send: true`, not draft mode. Mami wants the email to arrive immediately.
 5. **Reply body cleanup** — strip Gmail quote lines (`>` prefix, "On ... wrote:" headers) BEFORE passing to the script, or the regex parser may pick up wrong values from the quoted original email.
-6. **If the script fails** (non-zero exit code or invalid JSON), do NOT send any email. Report the error so Berke can debug locally.
+6. **If the script fails** (non-zero exit code or invalid JSON), do NOT send any email. Report the error so Mami can debug locally.
 7. **Pass the reply body using a heredoc** to avoid shell escaping issues:
    ```bash
-   python3 weekly_gym_update.py process --reply "$(cat <<'BERKE_REPLY'
+   python3 weekly_gym_update.py process --reply "$(cat <<'Mami_REPLY'
    MON: + | Bench felt great
    WED: stay | Quads sore
    FRI: + | Strong
    SAT: + | Solid deadlift
-   BERKE_REPLY
+   Mami_REPLY
    )"
    ```
 

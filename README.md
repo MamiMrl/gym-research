@@ -1,11 +1,11 @@
 # gym-research
 
-Automated weekly gym progression tracker. The active system is **System B** (Telegram bot, gpt-oss-20b on Groq, PDF emailed weekly). System A — the original email-based tracker — was **retired on 2026-06-03** and lives in `legacy_email/` for reference only.
+Automated weekly gym progression tracker. The active system is **System B** (Telegram voice-memo bot, Llama 3.3 70B + Whisper on Groq, Strava ingestion, PDF emailed weekly). System A — the original email-based tracker — was **retired on 2026-06-03** and lives in `legacy_email/` for reference only.
 
 | | System A (retired) | System B (current) |
 |---|---|---|
-| **Channel** | Email reply | Telegram conversation |
-| **LLM** | None (rule-based) | `openai/gpt-oss-20b` on Groq (with optional primary fallback) |
+| **Channel** | Email reply | Telegram voice memo |
+| **LLM** | None (rule-based) | `llama-3.3-70b-versatile` (planner) + `whisper-large-v3-turbo` (transcription) on Groq |
 | **Output** | HTML email + printable plan | PDF attached to email (via Resend) |
 | **Trigger** | Cloud routine `trig_01XUTpwZgjKkJw6VDq4HpZSh`, Sundays 08:00 Berlin | Vercel cron (via `vercel.json`), Sundays 08:00 UTC → GET `/trigger` |
 | **Code** | `legacy_email/` | `main.py`, `bot/`, `core/`, `config/`, `templates/`, `vercel.json` |
@@ -32,15 +32,18 @@ Automated weekly gym progression tracker. The active system is **System B** (Tel
 ├── railway.json               Legacy Railway config; not used
 ├── bot/
 │   ├── handlers.py            Telegram conversation flow (check-in → submit)
-│   ├── keyboards.py           Inline keyboards (status + submit)
+│   ├── keyboards.py           Inline keyboard (Confirm / Re-record)
 │   └── state.py               Neon Postgres per-chat check-in state + history
 ├── core/
 │   ├── schedule.py            Load/save config/schedule.json
 │   ├── prompt.py              System prompt + per-week prompt builder
-│   ├── llm_client.py          gpt-oss-20b (primary) → Groq (fallback)
+│   ├── llm_client.py          Groq llama-3.3-70b-versatile (strict JSON schema + Pydantic validation)
+│   ├── transcribe.py          Groq whisper-large-v3-turbo (voice memo → text)
+│   ├── strava.py              Strava OAuth refresh + recent-activity fetch + HR safety flag
 │   ├── pdf.py                 Jinja2 render → PDFShift API → PDF bytes
 │   └── email.py               Resend send w/ base64 PDF attachment
 ├── config/schedule.json       The weekly plan (LLM rewrites this on submit)
+├── scripts/strava_oauth.py    One-time helper: get a Strava refresh token (local)
 ├── templates/plan.html        Jinja2 A4 PDF template
 ├── .github/workflows/checkin.yml   Manual workflow_dispatch fallback (cron handled by Vercel)
 │
@@ -74,18 +77,19 @@ Set locally in `.env` and in your hosting provider's environment variables:
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 
-# LLM — Groq is the current sole provider (gpt-oss-20b at $0.10/$0.50 per M tokens, ~1000 tok/s).
-# Sign up at console.groq.com and paste the key here.
+# LLM + ASR — Groq is the sole provider.
+# Llama 3.3 70B for planning (strict JSON schema mode), Whisper turbo for voice transcription.
 GROQ_API_KEY=gsk_...
-GROQ_MODEL=openai/gpt-oss-20b                # optional override, verified against Groq docs
+GROQ_MODEL=llama-3.3-70b-versatile           # planner — non-reasoning, supports json_schema strict mode
+GROQ_WHISPER_MODEL=whisper-large-v3-turbo    # transcription — ~250× real-time
 
-# LLM — optional primary (any other OpenAI-compatible host serving gpt-oss-20b).
-# Leave these unset to call Groq directly. If set, the code calls the primary first
-# and falls back to Groq on error or timeout.
-# OSS_BASE_URL=https://openrouter.ai/api/v1   # e.g. OpenRouter, Fireworks, vLLM, local Ollama
-# OSS_API_KEY=...
-# OSS_MODEL=openai/gpt-oss-20b
-# OSS_TIMEOUT_S=60
+# Strava — required for cardio/HR ingestion and the HR safety flag.
+# 1. Create an app at https://www.strava.com/settings/api (callback domain: localhost)
+# 2. Run: python3 scripts/strava_oauth.py to get the refresh token
+STRAVA_CLIENT_ID=...
+STRAVA_CLIENT_SECRET=...
+STRAVA_REFRESH_TOKEN=...
+USER_MAX_HR=194                              # blank to disable flag; age-predicted = 220 − age
 
 # PDF generation — PDFShift managed API (50 free conversions/month, no system libs needed)
 # Sign up at pdfshift.io, copy the sk_... key.
@@ -236,6 +240,10 @@ Telegram user and chat IDs are 64-bit integers. Postgres `INTEGER` is 32-bit (ma
 
 psycopg v3's `execute()` runs **one SQL statement per call**. Passing a string with multiple semicolon-separated statements only executes the first one — subsequent tables are silently skipped. `init_db()` calls `execute()` once per table. If you add a new table to the schema, add a new `conn.execute(...)` call for it.
 
+### `Plan generation failed: Expecting value: line 1 column 1 (char 0)`
+
+This is `json.loads("")` — the LLM returned empty `content`. On `gpt-oss-20b` / `gpt-oss-120b` it's a *known model-architecture issue*, not a Groq config bug: gpt-oss models are reasoning models, they consume output tokens on internal reasoning before producing visible `content`, and with a long prompt + `max_tokens=2048` the reasoning can eat the entire budget. See [vLLM #30498](https://github.com/vllm-project/vllm/issues/30498), [HF gpt-oss-120b #67](https://huggingface.co/openai/gpt-oss-120b/discussions/67), [Groq community #516](https://community.groq.com/t/gpt-oss-browser-response-empty-assistant-content/516). Surfaced on the first live run (2026-06-04). Resolution is blocked on the architecture decision — see "Architecture decisions in flight" in `CLAUDE.md`.
+
 ### Vercel logs show old WeasyPrint errors
 
 Vercel's Logs tab shows entries from all deployments, not just the latest. A `libpango-1.0-0: cannot open shared object file` error is from a pre-migration deployment. Filter by the current deployment or check the timestamp — anything before commit `30787e5` (2026-06-04) is obsolete.
@@ -253,6 +261,8 @@ The code still supports a primary/fallback split (set `OSS_BASE_URL` + `OSS_API_
 **Failure surface:** any `openai.OpenAIError`, `json.JSONDecodeError`, or `ValueError` from the primary trips the fallback. If `GROQ_API_KEY` isn't set, the call raises `RuntimeError` and the bot tells you "Plan generation failed".
 
 **JSON parsing:** `response_format` was removed after Groq's `json_object` mode returned empty responses in production. The system prompt instructs JSON-only output; the client strips markdown fences defensively. If you see malformed JSON, Groq's strict `json_schema` mode is the next step — see [Groq Structured Outputs](https://console.groq.com/docs/structured-outputs) (incompatible with streaming/tool use; requires `additionalProperties: false` and all keys in `required`).
+
+> ⚠ **The first live run on 2026-06-04 surfaced a separate failure mode**: `gpt-oss-20b` returned empty `content` (reasoning tokens ate the `max_tokens` budget before producing visible output). This is documented architecture behavior of gpt-oss, not a Groq bug. **The LLM layer is currently under architectural review** — three paths are on the table (rule-based engine / switch to Llama 3.3 70B + strict schema / voice memo + LLM-as-parser). See "Architecture decisions in flight (2026-06-04)" in `CLAUDE.md` before changing anything in `core/llm_client.py` or `core/prompt.py`.
 
 ---
 
@@ -278,6 +288,73 @@ Scripts in `legacy_email/` still run locally (paths were rewritten to be relativ
 10. ☑ `chat_id` column type fixed: `INTEGER` → `BIGINT` (Telegram IDs are 64-bit)
 11. ☑ `init_db()` fixed: split multi-statement schema into two separate `execute()` calls; `_conn()` now a proper context manager that closes the connection
 12. ☑ Telegram webhook registered against `gym-research.vercel.app`
-13. ☐ End-to-end test: `curl https://gym-research.vercel.app/trigger -H "Authorization: Bearer ${CRON_SECRET}"`
+13. ⚠ End-to-end test (partial, 2026-06-04): ran via Telegram. Conversation flow worked through Submit. Failed at the LLM call — empty `content` from `gpt-oss-20b` (see Troubleshooting). Blocked on architecture decision in `CLAUDE.md`.
 
 (System A is already retired — no coexistence conflict.)
+
+---
+
+## Contributing
+
+This is a personal project owned by **MamiMrl** (Mami Maral, `mami.maral@icloud.com`). Outside contributions are welcome via PR.
+
+### 1. Set your git identity before your first commit
+
+Commits are only attributed to a GitHub account when the **author email matches a verified email on that account**. If you clone with a stale global config, your commits can end up attributed to someone else (this actually happened on this repo — 13 commits authored as `hberkecelik@gmail.com` were attributed to the wrong GitHub user until history was rewritten on 2026-06-04).
+
+Set your identity *per-repo* right after cloning:
+
+```bash
+git clone https://github.com/MamiMrl/gym-research.git
+cd gym-research
+git config user.name  "<your GitHub username>"
+git config user.email "<email verified on your GitHub account>"
+```
+
+Verify with `git config user.email` and `git log -1 --pretty=format:'%ae'` after your first commit.
+
+### 2. Branching and PRs
+
+- `main` is the deploy branch — every push to `main` triggers a production Vercel deploy.
+- For non-trivial changes, open a PR from a feature branch (`feat/...`, `fix/...`, `docs/...`). Vercel creates a preview deployment per PR — check it before merging.
+- Direct pushes to `main` are fine for docs-only or one-line config fixes.
+- Never force-push `main` without coordinating — it invalidates everyone else's clones and the Vercel deploy history.
+
+### 3. Pre-push checklist
+
+- `python -m py_compile $(git diff --name-only --cached | grep '\.py$')` — every committed `.py` file must compile.
+- `.env` is in `.gitignore` and must stay there. Never commit secrets, even if "just for testing."
+- If you change `bot/state.py` schema, remember psycopg v3 = **one statement per `execute()` call** (one `conn.execute(...)` per `CREATE TABLE`).
+- If you change anything in `main.py`, do NOT name a variable `app` or `application` unless it's the FastAPI instance (see Troubleshooting → ASGI entrypoint).
+- For UI/PDF changes, render locally with `python -m core.pdf /tmp/plan.pdf` before pushing.
+
+### 4. Infra ownership
+
+All third-party accounts are owned by **MamiMrl**. Ask for an invite if you need direct access; otherwise route changes through a PR.
+
+| Service | Purpose | Who has access |
+|---|---|---|
+| Vercel project `gym-research` | Hosting + cron | MamiMrl |
+| Neon Postgres `neon-cyan-nest` | State + history | MamiMrl (auto-linked via Vercel integration) |
+| Groq (`GROQ_API_KEY`) | LLM | MamiMrl |
+| PDFShift (`PDFSHIFT_API_KEY`) | PDF rendering (50/mo free) | MamiMrl |
+| Resend (`RESEND_API_KEY`) | Email delivery | MamiMrl (sandbox sender `onboarding@resend.dev`) |
+| Telegram bot (`TELEGRAM_BOT_TOKEN`) | Conversation channel | MamiMrl (created via @BotFather) |
+
+### 5. Pulling environment for local dev
+
+Don't copy secrets out of band. Once you've been added to the Vercel project:
+
+```bash
+vercel link        # connect this local repo to the Vercel project
+vercel env pull .env
+```
+
+This writes the full prod `.env` locally. If you're not on the Vercel project, ask MamiMrl for read-only values (you don't need most of them for code-only changes — `py_compile` plus a unit-level smoke test of the changed module is usually enough).
+
+### 6. Where to look next
+
+- **What each system does and why** → top of this README + `CLAUDE.md` System B header.
+- **What's in flight right now / known broken** → `CLAUDE.md` → "Architecture decisions in flight" + "What's left to do for System B".
+- **Why we made a given migration choice** (Railway → Vercel, WeasyPrint → PDFShift, SQLite → Neon) → `CLAUDE.md` session history.
+- **System A algorithm and research basis** → `CLAUDE.md` "System A — Full design docs" + `legacy_email/README.md`.

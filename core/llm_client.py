@@ -4,75 +4,87 @@ import os
 from typing import Optional
 
 from openai import OpenAI, OpenAIError
+from pydantic import BaseModel, ValidationError, Field
 
-from core.prompt import SYSTEM_PROMPT, build_prompt
+from core.prompt import SYSTEM_PROMPT, PLAN_JSON_SCHEMA, build_prompt
 
 log = logging.getLogger(__name__)
 
-PRIMARY_BASE_URL = os.environ.get("OSS_BASE_URL")
-PRIMARY_API_KEY = os.environ.get("OSS_API_KEY")
-PRIMARY_MODEL = os.environ.get("OSS_MODEL", "openai/gpt-oss-20b")
-
 GROQ_BASE_URL = os.environ.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 
-PRIMARY_TIMEOUT_S = float(os.environ.get("OSS_TIMEOUT_S", "60"))
-
-_primary: Optional[OpenAI] = None
-_fallback: Optional[OpenAI] = None
+_client: Optional[OpenAI] = None
 
 
-def _get_primary() -> Optional[OpenAI]:
-    global _primary
-    if _primary is None and PRIMARY_BASE_URL and PRIMARY_API_KEY:
-        _primary = OpenAI(
-            base_url=PRIMARY_BASE_URL,
-            api_key=PRIMARY_API_KEY,
-            timeout=PRIMARY_TIMEOUT_S,
-        )
-    return _primary
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        if not GROQ_API_KEY:
+            raise RuntimeError("GROQ_API_KEY is not set")
+        _client = OpenAI(base_url=GROQ_BASE_URL, api_key=GROQ_API_KEY)
+    return _client
 
 
-def _get_fallback() -> Optional[OpenAI]:
-    global _fallback
-    if _fallback is None and GROQ_API_KEY:
-        _fallback = OpenAI(base_url=GROQ_BASE_URL, api_key=GROQ_API_KEY)
-    return _fallback
+class _Exercise(BaseModel):
+    name: str
+    sets: int
+    reps: str
+    load_kg: float | None
+    note: str = ""
 
 
-def _call(client: OpenAI, model: str, user_message: str) -> dict:
+class _Session(BaseModel):
+    day: str
+    label: str
+    exercises: list[_Exercise]
+
+
+class WeeklyPlan(BaseModel):
+    week_label: str
+    deload: bool = False
+    deload_reason: str | None = None
+    sessions: list[_Session] = Field(min_length=1)
+
+
+def generate_plan(schedule: dict, transcript: str, strava_summary: dict | None = None) -> dict:
+    """Call the LLM with the planned schedule + voice transcript (+ optional Strava
+    summary) and return the validated next-week plan as a dict."""
+    user_message = build_prompt(schedule, transcript, strava_summary)
+    client = _get_client()
+
     resp = client.chat.completions.create(
-        model=model,
-        max_tokens=2048,
+        model=GROQ_MODEL,
+        max_tokens=4096,
+        temperature=0.2,
+        response_format={"type": "json_schema", "json_schema": PLAN_JSON_SCHEMA},
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_message},
         ],
     )
+
     raw = (resp.choices[0].message.content or "").strip()
-    # Strip markdown fences if the model wraps the JSON
+    if not raw:
+        raise RuntimeError(
+            f"LLM returned empty content. finish_reason={resp.choices[0].finish_reason}"
+        )
+
+    # Defensive: strip markdown fences if model wraps despite strict mode.
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
             raw = raw[4:]
-    return json.loads(raw.strip())
+        raw = raw.strip()
 
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"LLM returned invalid JSON: {e}\n---\n{raw[:500]}") from e
 
-def generate_plan(schedule: dict, results: dict) -> dict:
-    user_message = build_prompt(schedule, results)
+    try:
+        plan = WeeklyPlan.model_validate(data)
+    except ValidationError as e:
+        raise RuntimeError(f"LLM JSON failed schema validation: {e}") from e
 
-    primary = _get_primary()
-    if primary is not None:
-        try:
-            return _call(primary, PRIMARY_MODEL, user_message)
-        except (OpenAIError, json.JSONDecodeError, ValueError) as e:
-            log.warning("Primary gpt-oss endpoint failed (%s); falling back to Groq", e)
-
-    fallback = _get_fallback()
-    if fallback is None:
-        raise RuntimeError(
-            "No LLM available: set OSS_BASE_URL+OSS_API_KEY (primary) "
-            "or GROQ_API_KEY (fallback)."
-        )
-    return _call(fallback, GROQ_MODEL, user_message)
+    return plan.model_dump()

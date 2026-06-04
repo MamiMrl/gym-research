@@ -1,20 +1,8 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-STATUS_KEYBOARD = InlineKeyboardMarkup([
+CONFIRM_KEYBOARD = InlineKeyboardMarkup([
     [
-        InlineKeyboardButton("✓ As planned", callback_data="status:as_planned"),
-        InlineKeyboardButton("↑ Too easy",   callback_data="status:too_easy"),
+        InlineKeyboardButton("✓ Confirm & email", callback_data="confirm"),
+        InlineKeyboardButton("↻ Re-record",       callback_data="rerecord"),
     ],
-    [
-        InlineKeyboardButton("↓ Struggled",  callback_data="status:struggled"),
-        InlineKeyboardButton("✗ Skipped",    callback_data="status:skipped"),
-    ],
-])
-
-SKIP_NOTE_KEYBOARD = InlineKeyboardMarkup([
-    [InlineKeyboardButton("Skip note", callback_data="skip_note")]
-])
-
-SUBMIT_KEYBOARD = InlineKeyboardMarkup([
-    [InlineKeyboardButton("Submit and generate plan", callback_data="submit")]
 ])

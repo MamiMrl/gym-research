@@ -16,15 +16,16 @@ def _conn():
 
 
 def init_db() -> None:
+    # One execute() per statement — psycopg v3 rule.
     with _conn() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS checkin_state (
-                chat_id       BIGINT PRIMARY KEY,
-                session_idx   INTEGER NOT NULL DEFAULT 0,
-                exercise_idx  INTEGER NOT NULL DEFAULT 0,
-                awaiting_note INTEGER NOT NULL DEFAULT 0,
-                results       JSONB NOT NULL DEFAULT '{}',
-                started_at    TEXT NOT NULL
+                chat_id          BIGINT PRIMARY KEY,
+                voice_file_id    TEXT,
+                transcript       TEXT,
+                proposed_changes JSONB,
+                strava_summary   JSONB,
+                started_at       TEXT NOT NULL
             )
         """)
         conn.execute("""
@@ -33,7 +34,22 @@ def init_db() -> None:
                 week_number       INTEGER NOT NULL,
                 completed_at      TEXT NOT NULL,
                 schedule_snapshot JSONB NOT NULL,
-                results           JSONB NOT NULL
+                transcript        TEXT,
+                strava_summary    JSONB
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS strava_activities (
+                id              BIGINT PRIMARY KEY,
+                type            TEXT,
+                start_date      TIMESTAMPTZ,
+                distance_m      REAL,
+                moving_time_s   INTEGER,
+                avg_hr          REAL,
+                max_hr          REAL,
+                name            TEXT,
+                raw             JSONB,
+                fetched_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
         """)
 
@@ -57,10 +73,10 @@ def get_state(chat_id: int) -> dict | None:
         return None
     return {
         "chat_id": row["chat_id"],
-        "session_idx": row["session_idx"],
-        "exercise_idx": row["exercise_idx"],
-        "awaiting_note": bool(row["awaiting_note"]),
-        "results": row["results"],
+        "voice_file_id": row["voice_file_id"],
+        "transcript": row["transcript"],
+        "proposed_changes": row["proposed_changes"],
+        "strava_summary": row["strava_summary"],
         "started_at": row["started_at"],
     }
 
@@ -68,25 +84,25 @@ def get_state(chat_id: int) -> dict | None:
 def set_state(
     chat_id: int,
     *,
-    session_idx: int | None = None,
-    exercise_idx: int | None = None,
-    awaiting_note: bool | None = None,
-    results: dict | None = None,
+    voice_file_id: str | None = None,
+    transcript: str | None = None,
+    proposed_changes: dict | None = None,
+    strava_summary: dict | None = None,
 ) -> None:
     fields = []
     values = []
-    if session_idx is not None:
-        fields.append("session_idx = %s")
-        values.append(session_idx)
-    if exercise_idx is not None:
-        fields.append("exercise_idx = %s")
-        values.append(exercise_idx)
-    if awaiting_note is not None:
-        fields.append("awaiting_note = %s")
-        values.append(1 if awaiting_note else 0)
-    if results is not None:
-        fields.append("results = %s")
-        values.append(json.dumps(results))
+    if voice_file_id is not None:
+        fields.append("voice_file_id = %s")
+        values.append(voice_file_id)
+    if transcript is not None:
+        fields.append("transcript = %s")
+        values.append(transcript)
+    if proposed_changes is not None:
+        fields.append("proposed_changes = %s")
+        values.append(json.dumps(proposed_changes))
+    if strava_summary is not None:
+        fields.append("strava_summary = %s")
+        values.append(json.dumps(strava_summary))
     if not fields:
         return
     values.append(chat_id)
@@ -97,13 +113,26 @@ def set_state(
         )
 
 
-def end_checkin(chat_id: int, *, week_number: int, schedule: dict, results: dict) -> None:
+def end_checkin(
+    chat_id: int,
+    *,
+    week_number: int,
+    schedule: dict,
+    transcript: str | None,
+    strava_summary: dict | None,
+) -> None:
     now = datetime.now(timezone.utc).isoformat()
     with _conn() as conn:
         conn.execute(
-            "INSERT INTO checkin_history (week_number, completed_at, schedule_snapshot, results)"
-            " VALUES (%s, %s, %s, %s)",
-            (week_number, now, json.dumps(schedule), json.dumps(results)),
+            "INSERT INTO checkin_history (week_number, completed_at, schedule_snapshot, transcript, strava_summary)"
+            " VALUES (%s, %s, %s, %s, %s)",
+            (
+                week_number,
+                now,
+                json.dumps(schedule),
+                transcript,
+                json.dumps(strava_summary) if strava_summary else None,
+            ),
         )
         conn.execute("DELETE FROM checkin_state WHERE chat_id = %s", (chat_id,))
 

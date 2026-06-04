@@ -83,6 +83,24 @@
    - `_conn()` returned a bare `Connection` object; `with _conn() as conn:` managed the transaction (commit/rollback) but never closed the connection, leaking it to PgBouncer. Fix: `_conn()` is now a `@contextmanager` wrapping `psycopg.connect()` as the outer context manager, which closes the connection on exit.
    Rule: in psycopg v3, one `execute()` = one statement. For schema setup, call `execute()` once per table.
 
+**2026-06-04 (afternoon) — First live run from Telegram, LLM failure surfaced:**
+
+The full conversation flow worked end-to-end through Telegram (`/checkin` → per-exercise status buttons → notes → Submit), then crashed at the final step in `core/llm_client.py:59`:
+
+> `Plan generation failed: Expecting value: line 1 column 1 (char 0)`
+
+Root cause: `json.loads("")` — `resp.choices[0].message.content` came back empty (or `None`).
+
+This is a *known, documented* failure mode of `gpt-oss-20b` (and `gpt-oss-120b`), not a Groq config bug:
+- [vLLM #30498](https://github.com/vllm-project/vllm/issues/30498) — `content=null`, `finish_reason=length`
+- [HF gpt-oss-120b discussion #67](https://huggingface.co/openai/gpt-oss-120b/discussions/67)
+- [Groq community #516](https://community.groq.com/t/gpt-oss-browser-response-empty-assistant-content/516)
+- [Groq community #687](https://community.groq.com/t/structured-outputs-ignored-by-openai-gpt-oss-120b/687) — `gpt-oss-120b` silently ignores strict `json_schema` mode
+
+**Cause:** `gpt-oss-*` models are *reasoning* models. They spend output tokens on internal reasoning *before* producing user-visible `content`. With `max_tokens=2048` and a long schedule prompt, reasoning can consume the entire budget and `content` comes back empty. Architecture, not bug.
+
+**Status:** failure surfaced, **no fix landed yet**. Three architecture paths under discussion — see "Architecture decisions in flight (2026-06-04)" below.
+
 ### What's left to do for System B
 
 **Vercel secrets status (2026-06-04):** All required keys set in Vercel dashboard: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GROQ_API_KEY`, `GROQ_MODEL`, `CRON_SECRET`, `RESEND_API_KEY`, `RESEND_FROM` (`onboarding@resend.dev`), `YOUR_EMAIL` (`mami.maral@icloud.com`), `PDFSHIFT_API_KEY`. `DATABASE_URL` injected by Neon integration. Primary `OSS_*` unset — Groq is sole LLM provider.
@@ -92,7 +110,7 @@ Remaining steps before first live run:
 1. ☑ ~~All code changes complete and pushed~~ (commits `30787e5`, `b1b3ac0`, `b9299ac`, `4c94a30`)
 2. ☑ ~~Vercel deploy confirmed green~~
 3. ☑ ~~Telegram webhook registered~~
-4. ☐ **End-to-end test**: `curl https://gym-research.vercel.app/trigger -H "Authorization: Bearer $CRON_SECRET"` → expect Telegram DM → submit → email with PDF to `mami.maral@icloud.com`
+4. ⚠ **End-to-end test (partial, 2026-06-04 afternoon)**: ran via Telegram (not `curl`). Conversation flow worked through Submit. Failed at the final LLM call — empty content from `gpt-oss-20b` (see session entry above). PDF + email steps never reached. Blocked on architecture decision (see "Architecture decisions in flight" below).
 
 ### Open design questions / decisions deferred
 
@@ -103,6 +121,49 @@ Remaining steps before first live run:
 - ~~**PDF on serverless**~~ ✅ Resolved (2026-06-04): PDFShift API replaces WeasyPrint. 50 free conversions/month, no system libs needed.
 - ~~**State on serverless**~~ ✅ Resolved (2026-06-04): Neon Postgres replaces SQLite. `DATABASE_URL` injected by Vercel–Neon integration (`neon-cyan-nest`).
 - ~~**Bot lifecycle on serverless**~~ ✅ Resolved (2026-06-04): `async with ptb_app:` per-invocation. PTB renamed from `application` → `ptb_app` to avoid Vercel ASGI entrypoint collision.
+
+### Architecture decisions in flight (2026-06-04)
+
+Triggered by the `gpt-oss-20b` empty-content failure on the first live run. **No decision yet** — these are the three paths on the table.
+
+#### Path A — Remove the LLM entirely (rule-based engine)
+
+Port System A's rule-based weight adjuster (`legacy_email/weekly_gym_update.py`). The four status buttons (`as_planned` / `too_easy` / `struggled` / `skipped`) already carry the signal — the LLM was effectively doing arithmetic. Notes get *stored and displayed* in next week's plan rather than interpreted.
+
+- **Pros:** deterministic, free, deletes ~150 LOC and 3 env vars (`GROQ_API_KEY`, `GROQ_MODEL`, optional `OSS_*`). Lets us port System A's deload detection (6-week progression cap, fatigue keywords, set reductions) — pure rules, genuinely valuable.
+- **Cons:** notes are read by the human, not the bot. Requires a `weight_type` field per exercise in `config/schedule.json` to pick the right increment (`barbell: +2.5kg`, `dumbbell: +1kg`, `bodyweight: skip`, `cable: +2.5kg`).
+
+#### Path B — Switch model + strict JSON schema
+
+Stay on Groq but move from `openai/gpt-oss-20b` to `llama-3.3-70b-versatile`. Llama 3.3 is *not* a reasoning model, so no token-budget footgun. Enable strict `response_format={"type": "json_schema", "json_schema": {...}}` with the output schema declared explicitly. Add a Pydantic validation layer on parse.
+
+- **Pros:** production-proven in similar bots (see References). Same Groq account / env vars; ~$0.20/M tokens; ~275 tok/s. Strict mode guarantees schema-valid response or API error — eliminates the `json.loads("")` class of failures.
+- **Cons:** ~1.5x the code of Path A. Still subject to API outages and prompt drift (mitigated by strict mode + Pydantic + rule-based fallback).
+
+#### Path C — Voice memo check-in (LLM as parser, rules as executor)
+
+Replace the per-exercise button-tap flow with a single voice memo: "Bench felt great today, hit 75 clean. Squat was rough, dropped weight. Skipped deadlift, back tight." Groq Whisper (`whisper-large-v3-turbo`, ~250x real-time, ~$0.04/hr) transcribes; Llama 3.3 70B parses transcript → structured `{day: {exercise: {status, note}}}` JSON; rule engine applies adjustments. Confirmation card before applying.
+
+This is the architecture that *uses an LLM defensibly*: free-form natural language → structured data is genuinely a task rules cannot do. Schedule rewrite remains pure rules.
+
+- **Pros:** large UX win (one 60-second memo replaces ~12 button taps). LLM has a non-replaceable role. Existing button flow stays as fallback if transcript looks low-confidence. Cost ≪ $0.01 per Sunday run.
+- **Cons:** largest code change. Adds Whisper dependency, voice-message handling (`update.message.voice.get_file()`), confirmation card UI.
+
+#### Research references (2026-06-04)
+
+Two web-research passes informed the above:
+
+- **Real-world fitness/coaching bots — all use Llama 3.x, none use gpt-oss:**
+  - [ai-runner-coach](https://github.com/oleksandr-g-rock/ai-runner-coach) — Llama 3.3 via OpenRouter, Telegram + Strava
+  - [cycling-coach](https://github.com/yerzhansa/cycling-coach) — BYO OpenAI-compatible key, Llama default
+  - [Daily-20-Minute-Workout-Planner-Telegram-n8n](https://github.com/Ruzyuki/Daily-20-Minute-Workout-Planner-Telegram-n8n) — Llama via n8n, schema-validated
+  - [voice-transcribe-summarize-telegram-bot](https://github.com/aviaryan/voice-transcribe-summarize-telegram-bot) — Llama 3 70B + Whisper on Groq (closest match to Path C)
+
+- **gpt-oss empty-content as a known issue:** [vLLM #30498](https://github.com/vllm-project/vllm/issues/30498), [HF #67](https://huggingface.co/openai/gpt-oss-120b/discussions/67), [Groq #516](https://community.groq.com/t/gpt-oss-browser-response-empty-assistant-content/516), [Groq #687](https://community.groq.com/t/structured-outputs-ignored-by-openai-gpt-oss-120b/687).
+
+- **Strava integration considered and rejected** for strength training — Strava is cardio-only (GPS, pace, heart rate), no concept of sets/reps/loads. The right integrations for gym work would be Hevy, Strong, or HealthKit; but Telegram is already the import path, so auto-import isn't blocking.
+
+- **Best open-weight model for structured JSON by benchmark** is Qwen 2.5 32B/72B (~94% structured-extraction accuracy vs Llama 3.3 ~87% per [Humai benchmark](https://www.humai.blog/qwen-2-5-vs-llama-3-3-best-open-source-llms-for-2026/)), but Qwen 2.5 is **not** hosted on Groq. Would require a provider switch (Together / Fireworks / OpenRouter). Not worth it for a 1-call-per-week job.
 
 ---
 

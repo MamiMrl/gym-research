@@ -2,7 +2,7 @@
 
 > Read this header and `README.md` before doing any work. `README.md` is the canonical onboarding doc for collaborators; this file is the deeper status log + System A design appendix.
 
-## Directory layout (refreshed 2026-06-03)
+## Directory layout (refreshed 2026-06-04)
 
 ```
 .
@@ -34,10 +34,12 @@
 
 ## System B: Telegram-bot tracker (NEW — being built)
 
-**Status:** 🟡 Code complete, **deploy in progress** (last touched 2026-06-04) — Railway abandoned (credits exhausted), Fly.io superseded by Vercel (serverless, free tier, Git-connected)
+**Status:** 🟡 Deployed on Vercel, **Telegram webhook registration pending** (last touched 2026-06-04)
 **Trigger:** Vercel cron (`vercel.json`, `0 8 * * 0`) → GET `/trigger` → Telegram conversation → Submit → LLM → PDF → Resend email
-**LLM:** `openai/gpt-oss-20b` via any OpenAI-compatible host (primary) → Groq's hosted gpt-oss-20b (fallback). See `core/llm_client.py`. Anthropic SDK was removed on 2026-06-03 in favour of the open-weight gpt-oss model.
-**Code:** `main.py`, `bot/`, `core/`, `config/schedule.json`, `templates/plan.html`, `Dockerfile`, `Procfile`, `railway.json`, `vercel.json`, `.github/workflows/checkin.yml`
+**PDF:** PDFShift managed API (`core/pdf.py`) — renders Jinja2 HTML template, no system libs required
+**State:** Neon Postgres (`bot/state.py`, `psycopg` v3) — `checkin_state` + `checkin_history` tables, `DATABASE_URL` injected by Vercel–Neon integration
+**LLM:** `openai/gpt-oss-20b` on Groq. See `core/llm_client.py`.
+**Code:** `main.py`, `bot/`, `core/`, `config/schedule.json`, `templates/plan.html`, `vercel.json`
 **Docs:** See `README.md` for env vars, deploy steps, conversation flow, and LLM fallback notes.
 
 ### Session history
@@ -61,34 +63,35 @@
 - Fixed LLM JSON parsing: Groq's `json_object` response_format returned empty `failed_generation` in production. Removed `response_format` entirely; system prompt already enforces JSON output; client now strips markdown fences defensively (`core/llm_client.py`).
 
 **2026-06-04:**
-- Platform decision: **Vercel** (replaces both Railway and Fly.io). Serverless Python ASGI, native FastAPI support (no Mangum adapter), built-in cron via `vercel.json`, free Hobby tier (one cron/day, ±59 min timing precision — fine for weekly runs).
-- Researched Vercel constraints (official docs, 2026-06-04). Two blockers identified before deploy:
-  1. **WeasyPrint incompatible** — Vercel has no apt/system libs; Pango/Cairo cannot be installed or bundled. Must replace `core/pdf.py` with a managed PDF API (PDFShift recommended: HTTP POST → PDF bytes, 50 free conversions/month) or pure-Python renderer (reportlab/fpdf2).
-  2. **SQLite state doesn't persist** — serverless containers are ephemeral; `state.db` is gone after each invocation. Must migrate `bot/state.py` to Neon Postgres (`vercel install neon` auto-injects `DATABASE_URL`) or Upstash Redis.
-- Cron auth change: Vercel sends `Authorization: Bearer <CRON_SECRET>` on cron calls (GET, not POST). `/trigger` endpoint must be updated accordingly. `TRIGGER_SECRET` → `CRON_SECRET`.
-- GitHub Actions cron (`.github/workflows/checkin.yml`) superseded by `vercel.json` cron; keep as manual-dispatch fallback or remove.
-- Updated README.md and CLAUDE.md to reflect Vercel as the target platform.
+- Platform decision: **Vercel** (replaces both Railway and Fly.io). Serverless Python ASGI, native FastAPI support, built-in cron, free Hobby tier.
+- Researched Vercel constraints (official docs). Two hard blockers resolved:
+  1. **WeasyPrint incompatible** — replaced `core/pdf.py` with PDFShift API (`httpx.post` to `https://api.pdfshift.io/v3/convert/pdf`, `X-API-Key` header, `{"source": html_str, "format": "A4"}` body). Jinja2 template rendering unchanged. `PDFSHIFT_API_KEY` added to Vercel secrets.
+  2. **SQLite ephemeral on serverless** — replaced `bot/state.py` with Neon Postgres via `psycopg` v3. Schema: `JSONB` columns for `results`/`schedule_snapshot`, `GENERATED ALWAYS AS IDENTITY` for auto-increment. `DATABASE_URL` injected by Vercel–Neon integration. All function signatures unchanged — `handlers.py` required no edits.
+- `main.py` refactored for serverless: removed FastAPI `lifespan=` (Vercel's shutdown window is 500ms — too short for PTB teardown); replaced with `async with ptb_app:` per-invocation (PTB's official serverless pattern). PTB object renamed from `application` → `ptb_app` to avoid Vercel ASGI entrypoint collision (Vercel scans for `app` or `application`). `/trigger` changed from POST → GET; `TRIGGER_SECRET` → `CRON_SECRET`.
+- `vercel.json` created: cron `0 8 * * 0` → GET `/trigger`.
+- Vercel project `gym-research` created (Hobby, `MamiMrl/gym-research`, FastAPI preset). All secrets set via dashboard. Neon integration `neon-cyan-nest` connected (Vercel Marketplace → Native Integrations).
+- First deploy failed: entrypoint collision (`main:application` was PTB object, not ASGI). Fixed by renaming to `ptb_app` (commit `b1b3ac0`). Redeploy in progress.
 
 ### What's left to do for System B
 
-**`.env` status (2026-06-03):** All required keys are set: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GROQ_API_KEY`, `GROQ_MODEL`, `TRIGGER_SECRET`, `RESEND_API_KEY`, `RESEND_FROM` (`onboarding@resend.dev`), `YOUR_EMAIL` (`mami.maral@icloud.com`). Primary `OSS_*` intentionally left unset — Groq is the sole LLM provider. Note: `TRIGGER_SECRET` will be renamed `CRON_SECRET` when migrating to Vercel cron.
+**Vercel secrets status (2026-06-04):** All required keys set in Vercel dashboard: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GROQ_API_KEY`, `GROQ_MODEL`, `CRON_SECRET`, `RESEND_API_KEY`, `RESEND_FROM` (`onboarding@resend.dev`), `YOUR_EMAIL` (`mami.maral@icloud.com`), `PDFSHIFT_API_KEY`. `DATABASE_URL` injected by Neon integration. Primary `OSS_*` unset — Groq is sole LLM provider.
 
-Remaining steps before first live run (updated 2026-06-04 for Vercel):
+Remaining steps before first live run:
 
-1. **Replace WeasyPrint** in `core/pdf.py` with PDFShift (managed API, 50 free/month) or `reportlab`/`fpdf2` (pure Python, no system deps).
-2. **Migrate SQLite** in `bot/state.py` to Neon Postgres (`vercel install neon`) or Upstash Redis.
-3. **Update `/trigger`** in `main.py` to accept GET and verify `Authorization: Bearer <CRON_SECRET>`.
-4. **Add `vercel.json`** with cron config (`"path": "/trigger", "schedule": "0 8 * * 0"`).
-5. **Deploy to Vercel**: `vercel deploy --prod`, set secrets via `vercel env add ... production`. See `README.md` deploy section for the full command block.
-6. **Register Telegram webhook** against the Vercel URL: `curl -F "url=https://<app>.vercel.app/webhook" "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"`.
-7. **End-to-end test**: `curl https://<app>.vercel.app/trigger -H "Authorization: Bearer <CRON_SECRET>"` → expect Telegram DM → after Submit, email with PDF to `mami.maral@icloud.com`.
+1. ☑ ~~All code changes complete and pushed~~ (commits `30787e5`, `b1b3ac0`)
+2. ☐ **Confirm Vercel deploy is green** — check Deployments tab, verify `GET /` returns `{"status": "ok"}`
+3. ☐ **Register Telegram webhook**: `curl -F "url=https://gym-research.vercel.app/webhook" "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"`
+4. ☐ **End-to-end test**: `curl https://gym-research.vercel.app/trigger -H "Authorization: Bearer $CRON_SECRET"` → expect Telegram DM → submit → email with PDF to `mami.maral@icloud.com`
 
 ### Open design questions / decisions deferred
 
 - ~~**Schedule seeding**~~ ✅ Resolved (2026-06-03): `config/schedule.json` now contains the real Upper/Lower routine. `docs/personal-workout-plan.md` is a historical reference only — `config/schedule.json` is the live source of truth and is rewritten by the LLM on every Submit.
 - ~~**Resend domain**~~ ✅ Resolved: using `onboarding@resend.dev` sandbox; delivery address `mami.maral@icloud.com` is the Resend-verified recipient.
 - ~~**JSON mode upgrade**~~ ✅ Resolved differently (2026-06-03): `response_format=json_object` caused empty responses on Groq in production — removed entirely. System prompt enforces JSON; client strips fences. If malformed JSON reappears, migrate to `json_schema` strict mode (see `README.md` LLM design section).
-- ~~**Deploy platform**~~ ✅ Resolved (2026-06-04): Vercel chosen. Railway (credits), Fly.io (superseded). Two pre-deploy code changes required — see "What's left" above.
+- ~~**Deploy platform**~~ ✅ Resolved (2026-06-04): Vercel. Railway (credits exhausted), Fly.io (superseded). All code changes complete.
+- ~~**PDF on serverless**~~ ✅ Resolved (2026-06-04): PDFShift API replaces WeasyPrint. 50 free conversions/month, no system libs needed.
+- ~~**State on serverless**~~ ✅ Resolved (2026-06-04): Neon Postgres replaces SQLite. `DATABASE_URL` injected by Vercel–Neon integration (`neon-cyan-nest`).
+- ~~**Bot lifecycle on serverless**~~ ✅ Resolved (2026-06-04): `async with ptb_app:` per-invocation. PTB renamed from `application` → `ptb_app` to avoid Vercel ASGI entrypoint collision.
 
 ---
 

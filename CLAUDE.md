@@ -70,7 +70,18 @@
 - `main.py` refactored for serverless: removed FastAPI `lifespan=` (Vercel's shutdown window is 500ms — too short for PTB teardown); replaced with `async with ptb_app:` per-invocation (PTB's official serverless pattern). PTB object renamed from `application` → `ptb_app` to avoid Vercel ASGI entrypoint collision (Vercel scans for `app` or `application`). `/trigger` changed from POST → GET; `TRIGGER_SECRET` → `CRON_SECRET`.
 - `vercel.json` created: cron `0 8 * * 0` → GET `/trigger`.
 - Vercel project `gym-research` created (Hobby, `MamiMrl/gym-research`, FastAPI preset). All secrets set via dashboard. Neon integration `neon-cyan-nest` connected (Vercel Marketplace → Native Integrations).
-- First deploy failed: entrypoint collision (`main:application` was PTB object, not ASGI). Fixed by renaming to `ptb_app` (commit `b1b3ac0`). Redeploy in progress.
+- First deploy failed: entrypoint collision (`main:application` was PTB object, not ASGI). Fixed by renaming to `ptb_app` (commit `b1b3ac0`).
+
+**2026-06-04 (deployment debugging) — three bugs found and fixed:**
+
+1. **Vercel ASGI entrypoint collision** (commit `b1b3ac0`): Vercel's Python runtime scans `main.py` for a variable named `app` or `application` to use as the ASGI entrypoint. The PTB `Application` instance was named `application`, so Vercel picked it up instead of the FastAPI `app` and crashed with `Could not determine the application interface`. Fix: rename PTB object to `ptb_app` throughout. Rule: never name anything `app` or `application` in `main.py` unless it's the FastAPI instance.
+
+2. **Telegram chat IDs require BIGINT** (commit `b9299ac`): `checkin_state.chat_id` was defined as `INTEGER` (32-bit Postgres, max ~2.1B). Telegram chat IDs are 64-bit and overflow it, causing `psycopg.errors.NumericValueOutOfRange` on the first INSERT. Fix: `INTEGER` → `BIGINT`. Rule: always use `BIGINT` for any column storing Telegram user, chat, or message IDs.
+
+3. **psycopg v3 single-statement execute + connection leak** (commit `4c94a30`): Two separate bugs in `state.py`:
+   - `conn.execute(SCHEMA)` where SCHEMA contained two `CREATE TABLE` statements — psycopg v3's `execute()` only runs **one** statement per call. The second table (`checkin_history`) was silently never created. Fix: split into two separate `conn.execute()` calls inside the same `with` block.
+   - `_conn()` returned a bare `Connection` object; `with _conn() as conn:` managed the transaction (commit/rollback) but never closed the connection, leaking it to PgBouncer. Fix: `_conn()` is now a `@contextmanager` wrapping `psycopg.connect()` as the outer context manager, which closes the connection on exit.
+   Rule: in psycopg v3, one `execute()` = one statement. For schema setup, call `execute()` once per table.
 
 ### What's left to do for System B
 
@@ -78,9 +89,9 @@
 
 Remaining steps before first live run:
 
-1. ☑ ~~All code changes complete and pushed~~ (commits `30787e5`, `b1b3ac0`)
-2. ☐ **Confirm Vercel deploy is green** — check Deployments tab, verify `GET /` returns `{"status": "ok"}`
-3. ☐ **Register Telegram webhook**: `curl -F "url=https://gym-research.vercel.app/webhook" "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"`
+1. ☑ ~~All code changes complete and pushed~~ (commits `30787e5`, `b1b3ac0`, `b9299ac`, `4c94a30`)
+2. ☑ ~~Vercel deploy confirmed green~~
+3. ☑ ~~Telegram webhook registered~~
 4. ☐ **End-to-end test**: `curl https://gym-research.vercel.app/trigger -H "Authorization: Bearer $CRON_SECRET"` → expect Telegram DM → submit → email with PDF to `mami.maral@icloud.com`
 
 ### Open design questions / decisions deferred

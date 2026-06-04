@@ -222,6 +222,26 @@ Rules:
 
 ---
 
+## Troubleshooting
+
+### `Could not determine the application interface for 'main:application'`
+
+Vercel scans `main.py` for a variable named `app` or `application` to use as the ASGI entrypoint. If anything else in the file uses one of those names (e.g. a python-telegram-bot `Application` instance), Vercel grabs the wrong object and crashes. **Never name anything `app` or `application` in `main.py` unless it's the FastAPI instance.** The PTB object is named `ptb_app` for this reason.
+
+### `psycopg.errors.NumericValueOutOfRange: integer out of range` on first trigger
+
+Telegram user and chat IDs are 64-bit integers. Postgres `INTEGER` is 32-bit (max ~2.1 billion). Any column storing a Telegram ID must be `BIGINT`. If you recreate the schema from scratch, the `checkin_state` table already uses `BIGINT PRIMARY KEY` — don't change it back.
+
+### Tables missing at runtime (`relation "X" does not exist`)
+
+psycopg v3's `execute()` runs **one SQL statement per call**. Passing a string with multiple semicolon-separated statements only executes the first one — subsequent tables are silently skipped. `init_db()` calls `execute()` once per table. If you add a new table to the schema, add a new `conn.execute(...)` call for it.
+
+### Vercel logs show old WeasyPrint errors
+
+Vercel's Logs tab shows entries from all deployments, not just the latest. A `libpango-1.0-0: cannot open shared object file` error is from a pre-migration deployment. Filter by the current deployment or check the timestamp — anything before commit `30787e5` (2026-06-04) is obsolete.
+
+---
+
 ## LLM design (System B)
 
 `core/llm_client.py` calls **`openai/gpt-oss-20b`** (OpenAI's open-weight 21B-param model) via any OpenAI-compatible endpoint. The current deployment uses **Groq** as the sole provider — fast (~1000 tok/s), cheap ($0.10/$0.50 per M tokens), and reliable enough that a fallback isn't needed for once-a-week traffic.
@@ -255,7 +275,9 @@ Scripts in `legacy_email/` still run locally (paths were rewritten to be relativ
 7. ☑ Vercel project created (`gym-research`), GitHub auto-deploy connected, all secrets set
 8. ☑ Neon Postgres integration connected (`neon-cyan-nest`) — `DATABASE_URL` auto-injected
 9. ☑ Vercel entrypoint fix: PTB `Application` renamed to `ptb_app` (was colliding with Vercel's `application` ASGI detection)
-10. ☐ Register Telegram webhook: `curl -F "url=https://gym-research.vercel.app/webhook" "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook"`
-11. ☐ End-to-end test: `curl https://gym-research.vercel.app/trigger -H "Authorization: Bearer ${CRON_SECRET}"`
+10. ☑ `chat_id` column type fixed: `INTEGER` → `BIGINT` (Telegram IDs are 64-bit)
+11. ☑ `init_db()` fixed: split multi-statement schema into two separate `execute()` calls; `_conn()` now a proper context manager that closes the connection
+12. ☑ Telegram webhook registered against `gym-research.vercel.app`
+13. ☐ End-to-end test: `curl https://gym-research.vercel.app/trigger -H "Authorization: Bearer ${CRON_SECRET}"`
 
 (System A is already retired — no coexistence conflict.)

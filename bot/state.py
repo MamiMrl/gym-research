@@ -1,5 +1,6 @@
 import json
 import os
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 import psycopg
@@ -7,33 +8,34 @@ from psycopg.rows import dict_row
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS checkin_state (
-    chat_id       BIGINT PRIMARY KEY,
-    session_idx   INTEGER NOT NULL DEFAULT 0,
-    exercise_idx  INTEGER NOT NULL DEFAULT 0,
-    awaiting_note INTEGER NOT NULL DEFAULT 0,
-    results       JSONB NOT NULL DEFAULT '{}',
-    started_at    TEXT NOT NULL
-);
 
-CREATE TABLE IF NOT EXISTS checkin_history (
-    id                INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    week_number       INTEGER NOT NULL,
-    completed_at      TEXT NOT NULL,
-    schedule_snapshot JSONB NOT NULL,
-    results           JSONB NOT NULL
-);
-"""
-
-
-def _conn() -> psycopg.Connection:
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+@contextmanager
+def _conn():
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        yield conn
 
 
 def init_db() -> None:
     with _conn() as conn:
-        conn.execute(SCHEMA)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS checkin_state (
+                chat_id       BIGINT PRIMARY KEY,
+                session_idx   INTEGER NOT NULL DEFAULT 0,
+                exercise_idx  INTEGER NOT NULL DEFAULT 0,
+                awaiting_note INTEGER NOT NULL DEFAULT 0,
+                results       JSONB NOT NULL DEFAULT '{}',
+                started_at    TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS checkin_history (
+                id                INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                week_number       INTEGER NOT NULL,
+                completed_at      TEXT NOT NULL,
+                schedule_snapshot JSONB NOT NULL,
+                results           JSONB NOT NULL
+            )
+        """)
 
 
 def start_checkin(chat_id: int) -> None:
@@ -58,7 +60,7 @@ def get_state(chat_id: int) -> dict | None:
         "session_idx": row["session_idx"],
         "exercise_idx": row["exercise_idx"],
         "awaiting_note": bool(row["awaiting_note"]),
-        "results": row["results"],  # psycopg deserialises JSONB to dict automatically
+        "results": row["results"],
         "started_at": row["started_at"],
     }
 

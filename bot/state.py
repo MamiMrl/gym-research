@@ -9,7 +9,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS checkin_state (
-    chat_id       INTEGER PRIMARY KEY,
+    chat_id       BIGINT PRIMARY KEY,
     session_idx   INTEGER NOT NULL DEFAULT 0,
     exercise_idx  INTEGER NOT NULL DEFAULT 0,
     awaiting_note INTEGER NOT NULL DEFAULT 0,

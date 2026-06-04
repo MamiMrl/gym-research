@@ -1,10 +1,12 @@
+import os
 from datetime import date
 from pathlib import Path
 
+import httpx
 from jinja2 import Environment, FileSystemLoader
-from weasyprint import HTML
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
+PDFSHIFT_URL = "https://api.pdfshift.io/v3/convert/pdf"
 
 _env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
 
@@ -16,7 +18,17 @@ def render_pdf(plan: dict, output_path: str = "/tmp/plan.pdf") -> str:
         sessions=plan["sessions"],
         generated_date=date.today().strftime("%d %B %Y"),
     )
-    HTML(string=html_str).write_pdf(output_path)
+
+    response = httpx.post(
+        PDFSHIFT_URL,
+        headers={"X-API-Key": os.environ["PDFSHIFT_API_KEY"]},
+        json={"source": html_str, "format": "A4"},
+        timeout=60,
+    )
+    response.raise_for_status()
+
+    with open(output_path, "wb") as f:
+        f.write(response.content)
     return output_path
 
 

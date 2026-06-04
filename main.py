@@ -1,6 +1,5 @@
 import logging
 import os
-from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -22,8 +21,11 @@ logger = logging.getLogger("workout-tracker")
 
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = int(os.environ["TELEGRAM_CHAT_ID"])
-TRIGGER_SECRET = os.environ["TRIGGER_SECRET"]
+CRON_SECRET = os.environ["CRON_SECRET"]
 
+# Build Application once at module level (no lifespan — init/shutdown happen
+# per-invocation via `async with application:`, which is PTB's recommended
+# serverless pattern and avoids Vercel's unreliable lifespan + 500ms kill window).
 application = (
     Application.builder()
     .token(TELEGRAM_BOT_TOKEN)
@@ -36,22 +38,11 @@ application.add_handler(CommandHandler("checkin", handlers.start_checkin))
 application.add_handler(CallbackQueryHandler(handlers.on_callback))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handlers.on_text))
 
+# Init DB at module load — idempotent (CREATE TABLE IF NOT EXISTS), runs once
+# per cold-start container.
+state.init_db()
 
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
-    state.init_db()
-    await application.initialize()
-    await application.start()
-    logger.info("Bot started")
-    try:
-        yield
-    finally:
-        await application.stop()
-        await application.shutdown()
-        logger.info("Bot stopped")
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 
 @app.get("/")
@@ -62,18 +53,17 @@ async def health() -> dict:
 @app.post("/webhook")
 async def webhook(request: Request) -> dict:
     data = await request.json()
-    update = Update.de_json(data, application.bot)
-    await application.process_update(update)
+    async with application:
+        update = Update.de_json(data, application.bot)
+        await application.process_update(update)
     return {"ok": True}
 
 
-@app.post("/trigger")
+@app.get("/trigger")
 async def trigger(authorization: str | None = Header(default=None)) -> dict:
-    expected = f"Bearer {TRIGGER_SECRET}"
-    if authorization != expected:
+    if authorization != f"Bearer {CRON_SECRET}":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # Simulate /checkin invocation by injecting a synthetic update.
     class _Chat:
         id = TELEGRAM_CHAT_ID
 
@@ -85,5 +75,6 @@ async def trigger(authorization: str | None = Header(default=None)) -> dict:
         def effective_chat(self):
             return _Chat()
 
-    await handlers.start_checkin(_Update(), None)
+    async with application:
+        await handlers.start_checkin(_Update(), None)
     return {"ok": True, "triggered_chat_id": TELEGRAM_CHAT_ID}

@@ -7,9 +7,9 @@ Automated weekly gym progression tracker. The active system is **System B** (Tel
 | **Channel** | Email reply | Telegram conversation |
 | **LLM** | None (rule-based) | `openai/gpt-oss-20b` on Groq (with optional primary fallback) |
 | **Output** | HTML email + printable plan | PDF attached to email (via Resend) |
-| **Trigger** | Cloud routine `trig_01XUTpwZgjKkJw6VDq4HpZSh`, Sundays 08:00 Berlin | GitHub Actions cron, Sundays 08:00 UTC → Railway `/trigger` |
-| **Code** | `legacy_email/` | `main.py`, `bot/`, `core/`, `config/`, `templates/`, `Dockerfile`, `.github/` |
-| **Status** | ☠ Retired 2026-06-03 (routine permanently disabled, env lost) | 🟡 Code complete, not yet deployed (as of 2026-06-03) |
+| **Trigger** | Cloud routine `trig_01XUTpwZgjKkJw6VDq4HpZSh`, Sundays 08:00 Berlin | Vercel cron (via `vercel.json`), Sundays 08:00 UTC → `/trigger` |
+| **Code** | `legacy_email/` | `main.py`, `bot/`, `core/`, `config/`, `templates/`, `vercel.json`, `.github/` |
+| **Status** | ☠ Retired 2026-06-03 (routine permanently disabled, env lost) | 🟡 Code complete, pending Vercel deploy (Railway → Fly.io → Vercel migration, as of 2026-06-04) |
 | **Full docs** | `legacy_email/README.md` + `CLAUDE.md` (System A design appendix) | This file + `CLAUDE.md` (System B header) |
 
 ---
@@ -155,44 +155,65 @@ curl -F "url=https://<ngrok-id>.ngrok.app/webhook" \
      "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook"
 ```
 
-### Deploy to Fly.io
+### Deploy to Vercel
 
-Railway was tried but exhausted its credits during initial setup. **Fly.io** is the target platform — free tier, always-on, Docker-native.
+Railway (credits exhausted) and Fly.io were both attempted or considered before settling on **Vercel** — serverless, zero-ops, free tier, Git-connected.
+
+**Before deploying, two code changes are required** (see "Required changes" below):
 
 ```bash
-brew install flyctl
-flyctl auth login
-flyctl launch --dockerfile Dockerfile   # run from repo root; creates fly.toml
-flyctl secrets set \
-  TELEGRAM_BOT_TOKEN=... \
-  TELEGRAM_CHAT_ID=... \
-  GROQ_API_KEY=... \
-  GROQ_MODEL=openai/gpt-oss-20b \
-  TRIGGER_SECRET=... \
-  RESEND_API_KEY=... \
-  RESEND_FROM=onboarding@resend.dev \
-  YOUR_EMAIL=mami.maral@icloud.com
-flyctl deploy
+npm i -g vercel      # or: brew install vercel
+vercel login
+vercel link          # connects local repo to Vercel project
+
+# Set all secrets (use vercel env add NAME production < file to avoid shell history)
+vercel env add TELEGRAM_BOT_TOKEN production
+vercel env add TELEGRAM_CHAT_ID production
+vercel env add GROQ_API_KEY production
+vercel env add GROQ_MODEL production      # openai/gpt-oss-20b
+vercel env add CRON_SECRET production     # replaces TRIGGER_SECRET; Vercel injects this on cron calls
+vercel env add RESEND_API_KEY production
+vercel env add RESEND_FROM production     # onboarding@resend.dev
+vercel env add YOUR_EMAIL production      # mami.maral@icloud.com
+
+vercel deploy --prod
 ```
 
-After deploy, copy the public URL (e.g. `https://<app>.fly.dev`) and register the Telegram webhook:
+After deploy, copy the production URL (e.g. `https://<app>.vercel.app`) and register the Telegram webhook:
 
 ```bash
-curl -F "url=https://<app>.fly.dev/webhook" \
+curl -F "url=https://<app>.vercel.app/webhook" \
      "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook"
 ```
 
-Then add `BOT_TRIGGER_URL` (`https://<app>.fly.dev/trigger`) and `TRIGGER_SECRET` to GitHub Actions secrets, and trigger a manual `workflow_dispatch` to verify end-to-end.
+The Sunday 08:00 UTC cron is configured in `vercel.json` (see below) — no GitHub Actions secret needed.
+
+### vercel.json
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/trigger",
+      "schedule": "0 8 * * 0"
+    }
+  ]
+}
+```
+
+Vercel makes a **GET** request to `/trigger` and sends `Authorization: Bearer <CRON_SECRET>` automatically. The free (Hobby) tier supports one cron per project firing at most once per day; timing precision is ±59 minutes (acceptable for a weekly Sunday run).
 
 ### End-to-end test
 
 ```bash
-curl -X POST https://<app>.fly.dev/trigger \
-     -H "Authorization: Bearer ${TRIGGER_SECRET}"
+curl https://<app>.vercel.app/trigger \
+     -H "Authorization: Bearer ${CRON_SECRET}"
 ```
 
 Expected within ~10 seconds:
 1. Telegram DM starts the check-in conversation.
+
 2. Tap through each exercise → **Submit**.
 3. "Generating next week's plan…" message in Telegram.
 4. Email from `RESEND_FROM` with `plan-<week>.pdf` attached.
@@ -211,6 +232,8 @@ Expected within ~10 seconds:
 
 State lives in `state.db` (SQLite, single file). One row per active check-in keyed by `chat_id`, deleted on submit. History is appended to `checkin_history` and never cleared — the LLM can use it for future context.
 
+> **Vercel note:** SQLite file writes do not persist between serverless function invocations. Before deploying, migrate `state.db` to a hosted database — Neon (Postgres) is the recommended choice (free tier, SQL-compatible, auto-provisioned via `vercel install neon`). Upstash (Redis) is a lighter alternative if you prefer a key-value model.
+
 ### Schedule config
 
 `config/schedule.json` is the source of truth between weeks. Edit it manually whenever you want to restructure (add a session, drop an exercise). The LLM rewrites it on every Submit to bump loads / reps based on your check-in.
@@ -219,6 +242,46 @@ Rules:
 - `load_kg: null` = bodyweight or load irrelevant
 - `note` is pre-populated context the LLM can read
 - Add / remove sessions and exercises freely — the bot reads it at runtime
+
+### Required changes before deploying to Vercel
+
+Vercel's serverless runtime has two hard constraints that require code changes:
+
+**1. PDF generation — WeasyPrint is not viable**
+
+Vercel Python functions have no mechanism to install system packages (`apt-get`). WeasyPrint depends on Pango, Cairo, HarfBuzz, and ~15 other native `.so` libraries that cannot be bundled practically. Replace `core/pdf.py` with one of:
+
+| Option | Effort | Fidelity |
+|--------|--------|----------|
+| **PDFShift** (managed API) | Low — swap `core/pdf.py` to HTTP POST | High — renders the existing Jinja2 HTML template unchanged |
+| **Gotenberg** (self-hosted Docker) | Medium — run Gotenberg as a sidecar or on Fly.io | High — same HTML/CSS |
+| **reportlab / fpdf2** (pure Python) | Medium — rewrite template as code | Lower — loses CSS styling |
+
+PDFShift is the fastest path: send the rendered HTML string to `https://api.pdfshift.io/v3/convert/pdf`, receive bytes back, attach to Resend email. Free tier: 50 conversions/month.
+
+**2. State persistence — SQLite does not survive between invocations**
+
+`bot/state.py` writes to `state.db` on disk. On Vercel each request may land on a fresh container. Migrate to:
+
+- **Neon (Postgres)** — closest to SQLite semantics, free tier (~0.5 GB), provisioned via `vercel install neon` (injects `DATABASE_URL` automatically). Swap `sqlite3` calls to `psycopg2` or `asyncpg`.
+- **Upstash (Redis)** — simpler if you flatten check-in state to JSON blobs per `chat_id`. Free tier: 10,000 commands/day.
+
+**3. `/trigger` endpoint — must accept GET and verify `CRON_SECRET`**
+
+Vercel cron makes a **GET** request (not POST) and sends `Authorization: Bearer <CRON_SECRET>`. Update `main.py`:
+
+```python
+@app.get("/trigger")
+async def trigger(request: Request):
+    auth = request.headers.get("authorization", "")
+    if auth != f"Bearer {os.environ['CRON_SECRET']}":
+        raise HTTPException(status_code=401)
+    ...
+```
+
+**4. GitHub Actions cron — no longer needed**
+
+`vercel.json` replaces `.github/workflows/checkin.yml` for the weekly trigger. The workflow file can be removed or kept as a manual-dispatch fallback.
 
 ---
 
@@ -250,11 +313,15 @@ Scripts in `legacy_email/` still run locally (paths were rewritten to be relativ
 2. ☑ Local PDF smoke-test passed (2026-06-03)
 3. ☑ `config/schedule.json` seeded with real Upper/Lower routine (Mon/Wed/Fri/Sat) — see `CLAUDE.md` session history for current weights
 4. ☑ Pushed to GitHub
-5. ☑ Railway attempted — exhausted credits during initial deploy loops; switching to Fly.io
+5. ☑ Railway attempted — exhausted credits during initial deploy loops
 6. ☑ LLM JSON fix: removed `response_format=json_object` (caused empty responses on Groq); client now strips markdown fences instead
-7. ☐ Deploy to Fly.io, set secrets via `flyctl secrets set`
-8. ☐ Register Telegram webhook against the Fly.io URL
-9. ☐ Update GitHub Actions secret `BOT_TRIGGER_URL` to Fly.io URL
-10. ☐ Fire `workflow_dispatch` and verify end-to-end
+7. ☑ Platform decision: Vercel (2026-06-04) — replaces Fly.io; serverless Python ASGI, built-in cron, free tier
+8. ☐ Replace WeasyPrint in `core/pdf.py` with a managed PDF API (PDFShift recommended) — native system libs unavailable on Vercel
+9. ☐ Migrate `bot/state.py` from SQLite to Neon Postgres (or Upstash Redis) — file writes don't persist across invocations
+10. ☐ Update `/trigger` in `main.py` to accept GET and verify `Authorization: Bearer <CRON_SECRET>`
+11. ☐ Add `vercel.json` with cron config (`0 8 * * 0` → `/trigger`)
+12. ☐ Deploy: `vercel deploy --prod`, set secrets via `vercel env add ... production`
+13. ☐ Register Telegram webhook against the Vercel deployment URL
+14. ☐ Fire cron manually (`curl <url>/trigger -H "Authorization: Bearer <CRON_SECRET>"`) and verify end-to-end
 
 (System A is already retired, so there's no coexistence conflict to worry about.)

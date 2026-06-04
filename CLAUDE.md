@@ -2,16 +2,22 @@
 
 > Read this header and `README.md` before doing any work. `README.md` is the canonical onboarding doc for collaborators; this file is the deeper status log + System A design appendix.
 
-## Directory layout (refreshed 2026-06-04)
+## Directory layout (refreshed 2026-06-04 evening)
 
 ```
 .
 ├── README.md                  Collaborator onboarding (start here)
 ├── CLAUDE.md                  This file — status + System A design appendix
+├── .env.example               All env vars documented (Telegram, Groq, Strava, PDF, email)
 │
-├── # System B — Telegram bot (Vercel deploy target)
+├── # System B — Telegram voice-memo bot (Vercel deploy target)
 ├── main.py, requirements.txt, Dockerfile, Procfile, railway.json, vercel.json
-├── bot/, core/, config/, templates/, .github/
+├── bot/        handlers (voice flow), keyboards (Confirm/Re-record), state (Postgres)
+├── core/       llm_client (Llama 3.3), transcribe (Whisper), strava, pdf, email, prompt, schedule
+├── config/     schedule.json — live source of truth, rewritten by LLM on every Submit
+├── templates/  plan.html — Jinja2 A4 PDF template
+├── scripts/    strava_oauth.py — one-time local helper to mint a Strava refresh token
+├── .github/    workflow_dispatch fallback (cron handled by Vercel)
 │
 ├── legacy_email/              System A — retired 2026-06-03, archived for reference
 │   ├── README.md              Retirement note + how it worked
@@ -32,15 +38,17 @@
 **Flow (historical):** Gmail reply → script parses `MON: + / WED: stay / …` → updates weights → emails next week's HTML
 **Docs:** `legacy_email/README.md` for the retirement context; full algorithm + design notes below in this file (sections starting at "Executive Summary").
 
-## System B: Telegram-bot tracker (NEW — being built)
+## System B: Telegram voice-memo tracker (current)
 
-**Status:** 🟡 Deployed on Vercel, **Telegram webhook registration pending** (last touched 2026-06-04)
-**Trigger:** Vercel cron (`vercel.json`, `0 8 * * 0`) → GET `/trigger` → Telegram conversation → Submit → LLM → PDF → Resend email
-**PDF:** PDFShift managed API (`core/pdf.py`) — renders Jinja2 HTML template, no system libs required
-**State:** Neon Postgres (`bot/state.py`, `psycopg` v3) — `checkin_state` + `checkin_history` tables, `DATABASE_URL` injected by Vercel–Neon integration
-**LLM:** `openai/gpt-oss-20b` on Groq. See `core/llm_client.py`.
-**Code:** `main.py`, `bot/`, `core/`, `config/schedule.json`, `templates/plan.html`, `vercel.json`
-**Docs:** See `README.md` for env vars, deploy steps, conversation flow, and LLM fallback notes.
+**Status:** 🟡 Code complete on `main` (commit `b8c8a05`). **Awaiting user-side setup before next live run:** Strava OAuth, `USER_MAX_HR` decision, Vercel env-var update, and a manual `DROP TABLE checkin_state` in Neon (breaking schema change).
+**Flow:** Vercel cron (`vercel.json`, `0 8 * * 0`) → GET `/trigger` → `/checkin` DM with planned schedule + Strava digest → user sends voice memo → Whisper transcribes → Llama 3.3 70B applies progression rules → confirmation card with diff + HR flags → user taps **Confirm** → PDF (PDFShift) → email (Resend) → `config/schedule.json` rewritten.
+**PDF:** PDFShift managed API (`core/pdf.py`) — renders Jinja2 HTML template, no system libs required.
+**State:** Neon Postgres (`bot/state.py`, `psycopg` v3) — `checkin_state` (voice_file_id, transcript, proposed_changes, strava_summary), `checkin_history`, `strava_activities`. `DATABASE_URL` injected by Vercel–Neon integration.
+**LLM:** `llama-3.3-70b-versatile` on Groq with strict `json_schema` response_format + Pydantic `WeeklyPlan` validation. Progression rules + deload triggers embedded in the system prompt. See `core/llm_client.py` + `core/prompt.py`.
+**ASR:** `whisper-large-v3-turbo` on Groq (`core/transcribe.py`). Auto-detect language.
+**Strava:** OAuth refresh-token flow (`core/strava.py`) → `GET /athlete/activities?after=` weekly → UPSERT into `strava_activities` → digest fed to LLM + shown in confirmation card. HR safety flag triggers at max HR ≥ 95% of `USER_MAX_HR`.
+**Code:** `main.py`, `bot/`, `core/`, `config/schedule.json`, `templates/plan.html`, `vercel.json`, `scripts/strava_oauth.py`.
+**Docs:** See `README.md` for env vars and deploy steps; this file for full session history + design rationale.
 
 ### Session history
 
@@ -101,16 +109,40 @@ This is a *known, documented* failure mode of `gpt-oss-20b` (and `gpt-oss-120b`)
 
 **Status:** failure surfaced, **no fix landed yet**. Three architecture paths under discussion — see "Architecture decisions in flight (2026-06-04)" below.
 
-### What's left to do for System B
+**2026-06-04 (evening) — Path C-modified landed: voice flow + Llama 3.3 + Strava (commit `b8c8a05`):**
 
-**Vercel secrets status (2026-06-04):** All required keys set in Vercel dashboard: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GROQ_API_KEY`, `GROQ_MODEL`, `CRON_SECRET`, `RESEND_API_KEY`, `RESEND_FROM` (`onboarding@resend.dev`), `YOUR_EMAIL` (`mami.maral@icloud.com`), `PDFSHIFT_API_KEY`. `DATABASE_URL` injected by Neon integration. Primary `OSS_*` unset — Groq is sole LLM provider.
+User chose a hybrid of Paths B and C, plus a Strava add-on:
+- **Model swap** (Path B): `openai/gpt-oss-20b` → `llama-3.3-70b-versatile` with strict `response_format={"type":"json_schema",...}` and a Pydantic `WeeklyPlan` validation layer in `core/llm_client.py`. Fixes the empty-content failure.
+- **Voice memo** (Path C): button-tap state machine in `bot/handlers.py` deleted; replaced with a single `MessageHandler(filters.VOICE | filters.AUDIO)`. New `core/transcribe.py` wraps Groq `whisper-large-v3-turbo`. Rationale: user reported each button tap had a 2–3 s Telegram round-trip — 12 taps × 3 s was unacceptable.
+- **Rules in the prompt, not in code**: rather than porting System A's rule engine, the scientific progression rules (barbell ±2.5 kg, dumbbell ±1 kg, cable/machine ±2.5 kg, bw_weighted ±1.25 kg, bw_only never changes; deload triggers on 6 progression weeks / fatigue keywords / Strava CNS load) are embedded in `SYSTEM_PROMPT`. The LLM is both parser and executor. Trade-off: less deterministic than pure rules, but eliminates ~150 LOC of bespoke rule code and lets the user's free-form voice notes override the defaults naturally.
+- **Strava** (new): user wants cardio + HR ingestion for data accumulation and HR-safety feedback (visualizations later). `core/strava.py` does OAuth-refresh → fetch last 7 days → UPSERT into `strava_activities` → summary digest into the LLM prompt and the confirmation card. `scripts/strava_oauth.py` is a one-time local CLI to mint the refresh token.
+- **Schema rewrite**: `checkin_state` dropped `results`/`session_idx`/`exercise_idx`/`awaiting_note`; added `voice_file_id`/`transcript`/`proposed_changes`/`strava_summary`. `strava_activities` table added. **Breaking change** — `CREATE TABLE IF NOT EXISTS` won't migrate the existing table, so prod table must be dropped manually in Neon before first deploy.
+- **Confirmation card**: shows next-week diff (load deltas, sets changes, deload banner) + Strava summary + HR flags. Two buttons only: `Confirm & email` / `Re-record`. Submit emits PDF, sends Resend email, persists to `checkin_history`.
 
-Remaining steps before first live run:
+`py_compile` clean across all modules. Pushed in commit `b8c8a05`.
 
-1. ☑ ~~All code changes complete and pushed~~ (commits `30787e5`, `b1b3ac0`, `b9299ac`, `4c94a30`)
-2. ☑ ~~Vercel deploy confirmed green~~
-3. ☑ ~~Telegram webhook registered~~
-4. ⚠ **End-to-end test (partial, 2026-06-04 afternoon)**: ran via Telegram (not `curl`). Conversation flow worked through Submit. Failed at the final LLM call — empty content from `gpt-oss-20b` (see session entry above). PDF + email steps never reached. Blocked on architecture decision (see "Architecture decisions in flight" below).
+### What's left to do for System B — fresh start checklist (2026-06-05)
+
+**Vercel secrets — current state:** `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GROQ_API_KEY`, `CRON_SECRET`, `RESEND_API_KEY`, `RESEND_FROM`, `YOUR_EMAIL`, `PDFSHIFT_API_KEY` already set. `DATABASE_URL` injected by Neon. `GROQ_MODEL` is still `openai/gpt-oss-20b` — **must be updated** before next run.
+
+**User tasks to unblock the next live run (do in order):**
+
+1. ☐ Create Strava API app at https://www.strava.com/settings/api. Authorization callback domain: `localhost`. Note the `Client ID` and `Client Secret`.
+2. ☐ Put `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` in local `.env`, then run `python3 scripts/strava_oauth.py`. Browser → Authorize → script prints `STRAVA_REFRESH_TOKEN`.
+3. ☐ Decide `USER_MAX_HR`: measured max from a recent hard effort (best), age-predicted `220 − 26 = 194` (default), or blank to disable the HR safety flag. **Open question — Claude is waiting on this.**
+4. ☐ In Neon dashboard → SQL editor: `DROP TABLE IF EXISTS checkin_state;` (one-time migration; `CREATE TABLE IF NOT EXISTS` will rebuild it with the new schema on next deploy).
+5. ☐ In Vercel → Settings → Environment Variables, set/update:
+   - `GROQ_MODEL` = `llama-3.3-70b-versatile` (was `openai/gpt-oss-20b`)
+   - `GROQ_WHISPER_MODEL` = `whisper-large-v3-turbo` (new — optional, this is the default)
+   - `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_REFRESH_TOKEN` (from steps 1–2)
+   - `USER_MAX_HR` (from step 3; omit to disable flagging)
+6. ☐ Redeploy on Vercel.
+7. ☐ End-to-end test from Telegram: `/checkin` → bot replies with schedule + Strava digest → send a voice memo summarising the week → confirm card appears with diff + HR flags → tap **Confirm** → check email for PDF.
+
+**Known fragile spots to watch on the next live run:**
+- First `init_db()` call after deploy will succeed even if the old `checkin_state` is still there — `CREATE TABLE IF NOT EXISTS` is a no-op. If the old columns are still present, `INSERT INTO checkin_state (chat_id, started_at)` will fail because the old required columns (`results`, `session_idx`, etc.) aren't being provided. **The Neon `DROP TABLE` step above is load-bearing.**
+- Strava token-refresh failure is non-fatal in `start_checkin` (logged + ignored). If Strava is down or the refresh token is invalid, the bot still proceeds without the cardio context. Worth watching the Vercel logs the first time.
+- Voice memo > ~25 MB will be rejected by Groq Whisper. Telegram voice memos are normally well under this (Opus is efficient).
 
 ### Open design questions / decisions deferred
 
@@ -122,9 +154,15 @@ Remaining steps before first live run:
 - ~~**State on serverless**~~ ✅ Resolved (2026-06-04): Neon Postgres replaces SQLite. `DATABASE_URL` injected by Vercel–Neon integration (`neon-cyan-nest`).
 - ~~**Bot lifecycle on serverless**~~ ✅ Resolved (2026-06-04): `async with ptb_app:` per-invocation. PTB renamed from `application` → `ptb_app` to avoid Vercel ASGI entrypoint collision.
 
-### Architecture decisions in flight (2026-06-04)
+### Architecture decision (resolved 2026-06-04 evening)
 
-Triggered by the `gpt-oss-20b` empty-content failure on the first live run. **No decision yet** — these are the three paths on the table.
+**Chosen: Path B + Path C hybrid + Strava add-on.** Code shipped in commit `b8c8a05`. The three paths originally on the table — kept below for historical context — were evaluated together with the user, who also asked for Strava ingestion. The hybrid:
+- **From Path B**: Llama 3.3 70B + strict `json_schema` + Pydantic (fixes the empty-content bug).
+- **From Path C**: voice memo replaces the button-tap state machine (UX win — buttons had unacceptable 2–3 s round-trip latency per tap).
+- **Modified**: rules live in the LLM system prompt rather than a separate rule engine. The LLM is both parser and executor. Rationale: ~150 LOC saved, free-form voice notes can override rules naturally, and the cost (~$0.003/run) is trivial.
+- **Strava added**: HR + cardio context goes into the LLM prompt; HR safety flag (max HR ≥ 95% of `USER_MAX_HR`) surfaces in the confirmation card.
+
+Original options below for reference.
 
 #### Path A — Remove the LLM entirely (rule-based engine)
 
@@ -161,7 +199,7 @@ Two web-research passes informed the above:
 
 - **gpt-oss empty-content as a known issue:** [vLLM #30498](https://github.com/vllm-project/vllm/issues/30498), [HF #67](https://huggingface.co/openai/gpt-oss-120b/discussions/67), [Groq #516](https://community.groq.com/t/gpt-oss-browser-response-empty-assistant-content/516), [Groq #687](https://community.groq.com/t/structured-outputs-ignored-by-openai-gpt-oss-120b/687).
 
-- **Strava integration considered and rejected** for strength training — Strava is cardio-only (GPS, pace, heart rate), no concept of sets/reps/loads. The right integrations for gym work would be Hevy, Strong, or HealthKit; but Telegram is already the import path, so auto-import isn't blocking.
+- **Strava integration reconsidered and accepted** (2026-06-04 evening) — original 2026-06-04 conclusion rejected Strava because it can't track sets/reps. The user clarified the intended role: *not* a source of truth for strength work (Telegram voice memo remains the input for that), but a passive ingestion layer for cardio + heart rate. Use cases: HR safety flagging in the weekly confirmation card; data accumulation for future visualizations. Implemented in `core/strava.py` + `strava_activities` table.
 
 - **Best open-weight model for structured JSON by benchmark** is Qwen 2.5 32B/72B (~94% structured-extraction accuracy vs Llama 3.3 ~87% per [Humai benchmark](https://www.humai.blog/qwen-2-5-vs-llama-3-3-best-open-source-llms-for-2026/)), but Qwen 2.5 is **not** hosted on Groq. Would require a provider switch (Together / Fireworks / OpenRouter). Not worth it for a 1-call-per-week job.
 

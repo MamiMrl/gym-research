@@ -195,25 +195,34 @@ curl https://<app>.vercel.app/trigger \
 ```
 
 Expected within ~10 seconds:
-1. Telegram DM starts the check-in conversation.
+1. Telegram DM with this week's planned schedule and (if Strava is configured) the past-7-days cardio digest + any HR safety flags.
+2. Bot asks for a **voice memo** summarising how each session went.
+3. After you send the memo: bot replies with the transcript, then "Generating proposed plan…", then a diff showing next week's loads + a confirmation card (`Confirm & email` / `Re-record`).
+4. Tap **Confirm** → email from `RESEND_FROM` with `plan-<week>.pdf` attached, `config/schedule.json` rewritten on the server, check-in archived to `checkin_history`.
 
-2. Tap through each exercise → **Submit**.
-3. "Generating next week's plan…" message in Telegram.
-4. Email from `RESEND_FROM` with `plan-<week>.pdf` attached.
-5. `config/schedule.json` is rewritten with the LLM's adjusted plan (on the server).
-
-### Conversation flow
+### Voice-memo flow
 
 ```
 /checkin (or Sunday cron → /trigger)
-  → session header: "Monday — Push"
-  → for each exercise: [As planned] [Too easy] [Struggled] [Skipped]
-  → "Any note? (or Skip)"  ← optional free-text reply
-  → next exercise, next session
-  → [Submit] → LLM → PDF → Resend → confirmation in Telegram
+  → bot prints planned schedule + Strava digest (last 7 days, HR flags if any)
+  → bot: "send a voice memo summarising how the week went"
+  → user sends voice memo (any length — Telegram Opus, auto-detected language)
+  → Whisper transcribes (~1–3 s) → transcript printed back
+  → Llama 3.3 70B applies progression rules → proposed next-week plan
+  → bot shows diff (load deltas, set changes, deload banner) + confirmation card
+  → [Confirm & email]  →  PDF (PDFShift)  →  email (Resend)  →  schedule rewritten
+  → [Re-record]        →  clear transcript, wait for a new memo
 ```
 
-State lives in **Neon Postgres** (two tables: `checkin_state` for the active session, `checkin_history` for all completed check-ins). One row per active check-in keyed by `chat_id`, deleted on submit. History is never cleared — the LLM can use it for future context.
+Rules embedded in the LLM system prompt (see `core/prompt.py`):
+- Status inference: `as_planned` / `too_easy` / `struggled` / `skipped` per exercise, derived from the transcript.
+- Load increments: barbell ±2.5 kg, dumbbell ±1 kg, cable/machine ±2.5 kg, BW+weighted ±1.25 kg, BW-only never changes.
+- Deload triggers: 6 consecutive progression weeks, fatigue keywords (joint pain, exhausted, no energy, hurt, deload, etc.), or sustained Strava CNS load (max HR ≥ 95% `USER_MAX_HR`). On deload: keep loads, halve sets, set deload note.
+
+State lives in **Neon Postgres** — three tables:
+- `checkin_state` — single active check-in per chat (voice_file_id, transcript, proposed_changes, strava_summary). Deleted on Confirm.
+- `checkin_history` — every completed check-in (week_number, schedule_snapshot, transcript, strava_summary). Never cleared.
+- `strava_activities` — UPSERT'd cardio activities (id, type, distance, time, HR). Built up over time for future visualizations.
 
 ### Schedule config
 
@@ -240,9 +249,17 @@ Telegram user and chat IDs are 64-bit integers. Postgres `INTEGER` is 32-bit (ma
 
 psycopg v3's `execute()` runs **one SQL statement per call**. Passing a string with multiple semicolon-separated statements only executes the first one — subsequent tables are silently skipped. `init_db()` calls `execute()` once per table. If you add a new table to the schema, add a new `conn.execute(...)` call for it.
 
-### `Plan generation failed: Expecting value: line 1 column 1 (char 0)`
+### `Plan generation failed: Expecting value: line 1 column 1 (char 0)` (historical)
 
-This is `json.loads("")` — the LLM returned empty `content`. On `gpt-oss-20b` / `gpt-oss-120b` it's a *known model-architecture issue*, not a Groq config bug: gpt-oss models are reasoning models, they consume output tokens on internal reasoning before producing visible `content`, and with a long prompt + `max_tokens=2048` the reasoning can eat the entire budget. See [vLLM #30498](https://github.com/vllm-project/vllm/issues/30498), [HF gpt-oss-120b #67](https://huggingface.co/openai/gpt-oss-120b/discussions/67), [Groq community #516](https://community.groq.com/t/gpt-oss-browser-response-empty-assistant-content/516). Surfaced on the first live run (2026-06-04). Resolution is blocked on the architecture decision — see "Architecture decisions in flight" in `CLAUDE.md`.
+This was `json.loads("")` from `gpt-oss-20b` — a reasoning model that consumed the entire `max_tokens` budget on internal reasoning before producing visible `content`. Resolved 2026-06-04 evening by swapping to `llama-3.3-70b-versatile` with strict `json_schema` response_format + Pydantic validation in `core/llm_client.py`. If you see this on a fresh deploy, double-check that `GROQ_MODEL` is set to `llama-3.3-70b-versatile` in Vercel — not `openai/gpt-oss-20b`.
+
+### `INSERT or UPDATE on checkin_state ... null value in column "..." violates not-null constraint`
+
+The `checkin_state` schema was rewritten on 2026-06-04 evening (dropped `results`/`session_idx`/`exercise_idx`/`awaiting_note`, added `voice_file_id`/`transcript`/`proposed_changes`/`strava_summary`). `CREATE TABLE IF NOT EXISTS` is a no-op against the existing table, so the old columns persist until you drop it manually. Fix: in Neon SQL editor, run `DROP TABLE IF EXISTS checkin_state;` once, then redeploy — `init_db()` will recreate it with the new schema. `checkin_history` and `strava_activities` are unaffected.
+
+### Strava call failed in start_checkin
+
+Non-fatal. The bot logs the warning and proceeds without cardio context. Common causes: `STRAVA_REFRESH_TOKEN` invalid (re-run `scripts/strava_oauth.py`), Strava API rate-limited (100 req / 15 min, 1000 / day — we only call once per check-in so this should be impossible), or `STRAVA_CLIENT_*` env vars unset (the refresh request will 401).
 
 ### Vercel logs show old WeasyPrint errors
 
@@ -250,19 +267,34 @@ Vercel's Logs tab shows entries from all deployments, not just the latest. A `li
 
 ---
 
-## LLM design (System B)
+## LLM + ASR design (System B)
 
-`core/llm_client.py` calls **`openai/gpt-oss-20b`** (OpenAI's open-weight 21B-param model) via any OpenAI-compatible endpoint. The current deployment uses **Groq** as the sole provider — fast (~1000 tok/s), cheap ($0.10/$0.50 per M tokens), and reliable enough that a fallback isn't needed for once-a-week traffic.
+**Planner — `core/llm_client.py`** calls **`llama-3.3-70b-versatile`** on Groq with `response_format={"type":"json_schema","json_schema":PLAN_JSON_SCHEMA}` (strict mode). The response is parsed and validated against a Pydantic `WeeklyPlan` model before being returned. Strict mode guarantees the response either matches the schema or the API errors — eliminates the `json.loads("")` class of failures that bit `gpt-oss-20b` (see Troubleshooting).
 
-The code still supports a primary/fallback split (set `OSS_BASE_URL` + `OSS_API_KEY` to add a primary in front of Groq); the fallback kicks in on any `OpenAIError`, `json.JSONDecodeError`, or `ValueError` from the primary, with a default 60s timeout. Useful if you later self-host on Ollama / vLLM and want Groq as the safety net.
+**System prompt** (`core/prompt.py`) carries the entire progression rule set: status inference, per-exercise-type load increments, deload triggers (6-week progression cap, fatigue keywords, Strava CNS-load signal). The LLM is both parser *and* executor — user voice-memo notes can naturally override the defaults ("shoulder felt off, going down 2.5" beats `as_planned` → `+2.5 kg`).
 
-**Model ID on Groq:** `openai/gpt-oss-20b` (verified against [Groq docs](https://console.groq.com/docs/model/openai/gpt-oss-20b), 2026-06-03). Same ID works on most other hosts.
+**Why not a pure rule engine?** A separate rule engine adds ~150 LOC, requires per-exercise type tagging in `config/schedule.json`, and can't read free-form voice notes — which is exactly the signal we want. The LLM is cheap enough (~$0.003 per Sunday run) that the determinism trade-off is acceptable.
 
-**Failure surface:** any `openai.OpenAIError`, `json.JSONDecodeError`, or `ValueError` from the primary trips the fallback. If `GROQ_API_KEY` isn't set, the call raises `RuntimeError` and the bot tells you "Plan generation failed".
+**Transcription — `core/transcribe.py`** uses **`whisper-large-v3-turbo`** on Groq (~250× real-time, ~$0.04/hr). Telegram voice memos arrive as Ogg Opus; Whisper accepts them directly. Language is auto-detected (no hint required for English/German/Turkish/etc).
 
-**JSON parsing:** `response_format` was removed after Groq's `json_object` mode returned empty responses in production. The system prompt instructs JSON-only output; the client strips markdown fences defensively. If you see malformed JSON, Groq's strict `json_schema` mode is the next step — see [Groq Structured Outputs](https://console.groq.com/docs/structured-outputs) (incompatible with streaming/tool use; requires `additionalProperties: false` and all keys in `required`).
+**Failure surface:**
+- `RuntimeError("GROQ_API_KEY is not set")` — env var missing.
+- `RuntimeError("LLM returned empty content. finish_reason=…")` — should be impossible with strict mode + non-reasoning model, but defended against just in case.
+- `RuntimeError("LLM JSON failed schema validation: …")` — Pydantic caught a shape mismatch; surfaced verbatim in the Telegram error message.
 
-> ⚠ **The first live run on 2026-06-04 surfaced a separate failure mode**: `gpt-oss-20b` returned empty `content` (reasoning tokens ate the `max_tokens` budget before producing visible output). This is documented architecture behavior of gpt-oss, not a Groq bug. **The LLM layer is currently under architectural review** — three paths are on the table (rule-based engine / switch to Llama 3.3 70B + strict schema / voice memo + LLM-as-parser). See "Architecture decisions in flight (2026-06-04)" in `CLAUDE.md` before changing anything in `core/llm_client.py` or `core/prompt.py`.
+## Strava integration
+
+`core/strava.py` handles the cardio + heart-rate ingestion side. **Not** used as a source of truth for strength work (Strava has no concept of sets/reps/loads); used as a passive enrichment layer for the LLM prompt and the confirmation card.
+
+**Flow each Sunday:**
+1. `start_checkin` calls `refresh_access_token()` (cached for the 6-hour TTL Strava grants) → `fetch_recent_activities(days=7)`.
+2. Activities are UPSERT'd into `strava_activities` (BIGINT primary key = Strava activity ID).
+3. `summarize()` builds a digest: count, total km, total moving minutes, per-activity (type, distance, avg/max HR), and an `hr_flags` list flagging any activity with max HR ≥ 95% of `USER_MAX_HR`.
+4. Digest is stored in `checkin_state.strava_summary`, shown in the Telegram preview, and threaded into the LLM prompt as additional context.
+
+Strava call failures are **non-fatal** — the bot logs a warning and proceeds without cardio context. The check-in still works without Strava configured at all (leave `STRAVA_*` env vars unset).
+
+**One-time auth:** run `python3 scripts/strava_oauth.py` locally after putting `STRAVA_CLIENT_ID` + `STRAVA_CLIENT_SECRET` in `.env`. The script opens your browser, catches the OAuth callback on `localhost:8765`, and prints the refresh token to paste into Vercel. Refresh tokens don't expire unless you revoke the app or change scopes — so this is genuinely once.
 
 ---
 
@@ -276,19 +308,29 @@ Scripts in `legacy_email/` still run locally (paths were rewritten to be relativ
 
 ## Deployment checklist (System B)
 
+**Infra (done):**
 1. ☑ `config/schedule.json` seeded with real Upper/Lower routine (Mon/Wed/Fri/Sat)
-2. ☑ LLM JSON fix: removed `response_format=json_object`; client strips markdown fences
-3. ☑ `core/pdf.py` — WeasyPrint replaced with PDFShift API (`httpx` POST, `X-API-Key` header)
-4. ☑ `bot/state.py` — SQLite replaced with Neon Postgres (`psycopg` v3, `JSONB` columns)
-5. ☑ `main.py` — no lifespan, `async with ptb_app:` per-invocation, GET `/trigger`, `CRON_SECRET`
-6. ☑ `vercel.json` — cron `0 8 * * 0` → GET `/trigger`
-7. ☑ Vercel project created (`gym-research`), GitHub auto-deploy connected, all secrets set
-8. ☑ Neon Postgres integration connected (`neon-cyan-nest`) — `DATABASE_URL` auto-injected
-9. ☑ Vercel entrypoint fix: PTB `Application` renamed to `ptb_app` (was colliding with Vercel's `application` ASGI detection)
-10. ☑ `chat_id` column type fixed: `INTEGER` → `BIGINT` (Telegram IDs are 64-bit)
-11. ☑ `init_db()` fixed: split multi-statement schema into two separate `execute()` calls; `_conn()` now a proper context manager that closes the connection
-12. ☑ Telegram webhook registered against `gym-research.vercel.app`
-13. ⚠ End-to-end test (partial, 2026-06-04): ran via Telegram. Conversation flow worked through Submit. Failed at the LLM call — empty `content` from `gpt-oss-20b` (see Troubleshooting). Blocked on architecture decision in `CLAUDE.md`.
+2. ☑ `core/pdf.py` — PDFShift API (no system libs)
+3. ☑ `bot/state.py` — Neon Postgres (`psycopg` v3, `JSONB`, BIGINT chat_id, one execute() per CREATE TABLE)
+4. ☑ `main.py` — no lifespan, `async with ptb_app:` per-invocation, GET `/trigger`, `CRON_SECRET`
+5. ☑ `vercel.json` — cron `0 8 * * 0` → GET `/trigger`
+6. ☑ Vercel project (`gym-research`), GitHub auto-deploy, Neon integration (`neon-cyan-nest`)
+7. ☑ Telegram webhook registered against `gym-research.vercel.app`
+
+**Refactor (2026-06-04 evening, commit `b8c8a05` — code complete):**
+8. ☑ LLM swap: `gpt-oss-20b` → `llama-3.3-70b-versatile`, strict `json_schema` + Pydantic validation
+9. ☑ Whisper added: `core/transcribe.py` with `whisper-large-v3-turbo`
+10. ☑ Button-tap UI deleted; replaced with `MessageHandler(filters.VOICE | filters.AUDIO)` voice flow + Confirm/Re-record card
+11. ☑ Strava added: `core/strava.py` + `strava_activities` table + HR safety flag
+12. ☑ `scripts/strava_oauth.py` one-time auth helper
+13. ☑ `.env.example` documents the full env-var surface
+
+**Pending user-side setup (do before next live run):**
+14. ☐ Create Strava API app, run `scripts/strava_oauth.py`, get refresh token
+15. ☐ Decide `USER_MAX_HR` (or omit to disable flagging)
+16. ☐ Neon: `DROP TABLE IF EXISTS checkin_state;` (one-time migration for the new schema)
+17. ☐ Vercel env vars: set `GROQ_MODEL=llama-3.3-70b-versatile`, add `STRAVA_*`, add `USER_MAX_HR`
+18. ☐ Redeploy + end-to-end voice-memo test from Telegram
 
 (System A is already retired — no coexistence conflict.)
 
@@ -355,6 +397,6 @@ This writes the full prod `.env` locally. If you're not on the Vercel project, a
 ### 6. Where to look next
 
 - **What each system does and why** → top of this README + `CLAUDE.md` System B header.
-- **What's in flight right now / known broken** → `CLAUDE.md` → "Architecture decisions in flight" + "What's left to do for System B".
+- **What's in flight right now / known broken / fresh-start checklist** → `CLAUDE.md` → "What's left to do for System B — fresh start checklist".
 - **Why we made a given migration choice** (Railway → Vercel, WeasyPrint → PDFShift, SQLite → Neon) → `CLAUDE.md` session history.
 - **System A algorithm and research basis** → `CLAUDE.md` "System A — Full design docs" + `legacy_email/README.md`.

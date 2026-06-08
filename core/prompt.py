@@ -42,7 +42,23 @@ OUTPUT RULES
 ═══════════════════════════════════════
 
 - Keep the same session structure (same days, same exercise order, same exercise names).
-- Output ONLY the JSON object matching the response schema. No preamble. No markdown fences.
+- Output ONLY a JSON object with EXACTLY these top-level keys — no other keys, no preamble, no markdown fences:
+
+{
+  "week_label": "<string>",
+  "deload": <true|false>,
+  "deload_reason": "<string or null>",
+  "sessions": [
+    {
+      "day": "<string>",
+      "label": "<string>",
+      "exercises": [
+        {"name": "<string>", "sets": <int>, "reps": "<string>", "load_kg": <number|null>, "note": "<string>"}
+      ]
+    }
+  ]
+}
+
 - Every load_kg that is null in the input MUST stay null in the output.
 - Round all load_kg values to the nearest 0.25 kg.
 """

@@ -64,39 +64,9 @@ def _format_diff(old: dict, new: dict) -> str:
     return "\n".join(lines)
 
 
-def _format_strava_section(summary: dict | None) -> str:
-    if not summary or summary.get("count", 0) == 0:
-        return ""
-    lines = ["", "*Strava (past 7 days):*"]
-    lines.append(
-        f"  {summary['count']} activities, "
-        f"{summary['total_distance_km']} km, "
-        f"{summary['total_moving_time_min']} min moving"
-    )
-    flags = summary.get("hr_flags") or []
-    if flags:
-        lines.append("  ⚠ HR flags:")
-        for f in flags:
-            lines.append(f"    • {f}")
-    return "\n".join(lines)
-
-
 async def start_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
     st.start_checkin(chat_id)
-
-    # Try to fetch + persist Strava activities. Failure is non-fatal.
-    strava_summary = None
-    try:
-        from core import strava
-        from bot.state import _conn  # noqa: WPS437 — internal helper
-        activities = strava.fetch_recent_activities(7)
-        with _conn() as conn:
-            strava.persist_activities(conn, activities)
-        strava_summary = strava.summarize(activities)
-        st.set_state(chat_id, strava_summary=strava_summary)
-    except Exception as exc:
-        logger.warning("Strava fetch failed (non-fatal): %s", exc)
 
     schedule = load_schedule()
     intro = (
@@ -108,10 +78,6 @@ async def start_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
     await update.effective_chat.send_message(intro, parse_mode="Markdown")
     await update.effective_chat.send_message(_format_schedule(schedule), parse_mode="Markdown")
-
-    strava_section = _format_strava_section(strava_summary)
-    if strava_section:
-        await update.effective_chat.send_message(strava_section, parse_mode="Markdown")
 
 
 async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -158,9 +124,8 @@ async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
     schedule = load_schedule()
-    strava_summary = s.get("strava_summary")
     try:
-        new_plan = llm_client.generate_plan(schedule, transcript, strava_summary)
+        new_plan = llm_client.generate_plan(schedule, transcript)
     except Exception as exc:
         logger.exception("LLM plan generation failed")
         await update.effective_chat.send_message(
@@ -230,7 +195,6 @@ async def _on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         week_number=week_number,
         schedule=schedule,
         transcript=s.get("transcript"),
-        strava_summary=s.get("strava_summary"),
     )
 
     await update.effective_chat.send_message(

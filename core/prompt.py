@@ -1,9 +1,8 @@
 SYSTEM_PROMPT = """You are a strength-training progression engine.
 
-You receive THREE inputs:
+You receive TWO inputs:
 1. PLANNED SCHEDULE — this week's prescribed sessions (day, exercises, sets, reps, load_kg, note).
 2. VOICE-MEMO TRANSCRIPT — the user's free-form spoken summary of how the week went.
-3. STRAVA SUMMARY (optional) — cardio activity context from the past 7 days.
 
 Your job is to produce next week's schedule by applying the rules below to the planned schedule based on what the user reported in the transcript.
 
@@ -34,7 +33,6 @@ DELOAD DETECTION (overrides everything)
 
 Trigger a deload week if ANY of:
 - Transcript mentions: "joint pain", "deload", "exhausted", "burned out", "no energy", "very sore", "still sore", "hurt", "wrecked"
-- Strava summary shows sustained max HR > 95% of user max for multiple sessions (sign of CNS load)
 - More than half the exercises were "struggled" or "skipped"
 
 On deload: KEEP all loads identical to this week. REDUCE sets to ~50% (3→2, 4→2). Set week_label to include "DELOAD". Add an exercise-level note "deload — stop 3-4 RIR".
@@ -94,7 +92,7 @@ PLAN_JSON_SCHEMA = {
 }
 
 
-def build_prompt(schedule: dict, transcript: str, strava_summary: dict | None = None) -> str:
+def build_prompt(schedule: dict, transcript: str) -> str:
     lines = ["PLANNED SCHEDULE (this week):"]
     for session in schedule["sessions"]:
         lines.append(f"\n{session['day']} — {session['label']}")
@@ -105,24 +103,5 @@ def build_prompt(schedule: dict, transcript: str, strava_summary: dict | None = 
 
     lines.append("\n\nVOICE-MEMO TRANSCRIPT:")
     lines.append(transcript.strip() or "(empty)")
-
-    if strava_summary:
-        lines.append("\n\nSTRAVA SUMMARY (past 7 days):")
-        lines.append(
-            f"  {strava_summary.get('count', 0)} activities, "
-            f"{strava_summary.get('total_distance_km', 0):.1f} km total, "
-            f"{strava_summary.get('total_moving_time_min', 0)} min moving."
-        )
-        for a in strava_summary.get("activities", []):
-            lines.append(
-                f"  - {a.get('start_date', '')[:10]} {a.get('type', '')}: "
-                f"{a.get('distance_km', 0):.1f} km, "
-                f"avg HR {a.get('avg_hr') or '–'}, max HR {a.get('max_hr') or '–'}"
-            )
-        flags = strava_summary.get("hr_flags") or []
-        if flags:
-            lines.append("  HR flags:")
-            for f in flags:
-                lines.append(f"    ⚠ {f}")
 
     return "\n".join(lines)

@@ -47,10 +47,9 @@ class WeeklyPlan(BaseModel):
     sessions: list[_Session] = Field(min_length=1)
 
 
-def generate_plan(schedule: dict, transcript: str, strava_summary: dict | None = None) -> dict:
-    """Call the LLM with the planned schedule + voice transcript (+ optional Strava
-    summary) and return the validated next-week plan as a dict."""
-    user_message = build_prompt(schedule, transcript, strava_summary)
+def generate_plan(schedule: dict, transcript: str) -> dict:
+    """Call the LLM with the planned schedule + voice transcript and return the validated next-week plan as a dict."""
+    user_message = build_prompt(schedule, transcript)
     client = _get_client()
 
     resp = client.chat.completions.create(

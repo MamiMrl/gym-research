@@ -24,7 +24,6 @@ def init_db() -> None:
                 voice_file_id    TEXT,
                 transcript       TEXT,
                 proposed_changes JSONB,
-                strava_summary   JSONB,
                 started_at       TEXT NOT NULL
             )
         """)
@@ -34,22 +33,7 @@ def init_db() -> None:
                 week_number       INTEGER NOT NULL,
                 completed_at      TEXT NOT NULL,
                 schedule_snapshot JSONB NOT NULL,
-                transcript        TEXT,
-                strava_summary    JSONB
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS strava_activities (
-                id              BIGINT PRIMARY KEY,
-                type            TEXT,
-                start_date      TIMESTAMPTZ,
-                distance_m      REAL,
-                moving_time_s   INTEGER,
-                avg_hr          REAL,
-                max_hr          REAL,
-                name            TEXT,
-                raw             JSONB,
-                fetched_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                transcript        TEXT
             )
         """)
 
@@ -76,7 +60,6 @@ def get_state(chat_id: int) -> dict | None:
         "voice_file_id": row["voice_file_id"],
         "transcript": row["transcript"],
         "proposed_changes": row["proposed_changes"],
-        "strava_summary": row["strava_summary"],
         "started_at": row["started_at"],
     }
 
@@ -87,7 +70,6 @@ def set_state(
     voice_file_id: str | None = None,
     transcript: str | None = None,
     proposed_changes: dict | None = None,
-    strava_summary: dict | None = None,
 ) -> None:
     fields = []
     values = []
@@ -100,9 +82,6 @@ def set_state(
     if proposed_changes is not None:
         fields.append("proposed_changes = %s")
         values.append(json.dumps(proposed_changes))
-    if strava_summary is not None:
-        fields.append("strava_summary = %s")
-        values.append(json.dumps(strava_summary))
     if not fields:
         return
     values.append(chat_id)
@@ -119,20 +98,13 @@ def end_checkin(
     week_number: int,
     schedule: dict,
     transcript: str | None,
-    strava_summary: dict | None,
 ) -> None:
     now = datetime.now(timezone.utc).isoformat()
     with _conn() as conn:
         conn.execute(
-            "INSERT INTO checkin_history (week_number, completed_at, schedule_snapshot, transcript, strava_summary)"
-            " VALUES (%s, %s, %s, %s, %s)",
-            (
-                week_number,
-                now,
-                json.dumps(schedule),
-                transcript,
-                json.dumps(strava_summary) if strava_summary else None,
-            ),
+            "INSERT INTO checkin_history (week_number, completed_at, schedule_snapshot, transcript)"
+            " VALUES (%s, %s, %s, %s)",
+            (week_number, now, json.dumps(schedule), transcript),
         )
         conn.execute("DELETE FROM checkin_state WHERE chat_id = %s", (chat_id,))
 

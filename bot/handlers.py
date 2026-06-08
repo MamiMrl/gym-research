@@ -80,6 +80,32 @@ async def start_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.effective_chat.send_message(_format_schedule(schedule), parse_mode="Markdown")
 
 
+async def _generate_and_show_plan(update: Update, chat_id: int, transcript: str) -> None:
+    st.set_state(chat_id, transcript=transcript)
+    await update.effective_chat.send_message(
+        f"*Transcript:*\n_{transcript}_\n\nGenerating proposed plan…",
+        parse_mode="Markdown",
+    )
+
+    schedule = load_schedule()
+    try:
+        new_plan = llm_client.generate_plan(schedule, transcript)
+    except Exception as exc:
+        logger.exception("LLM plan generation failed")
+        await update.effective_chat.send_message(
+            f"Plan generation failed: {exc}\n\nSend /checkin to retry."
+        )
+        return
+
+    st.set_state(chat_id, proposed_changes=new_plan)
+    diff = _format_diff(schedule, new_plan)
+    await update.effective_chat.send_message(
+        diff + "\n\nConfirm to email the PDF, or re-record if anything is wrong.",
+        parse_mode="Markdown",
+        reply_markup=CONFIRM_KEYBOARD,
+    )
+
+
 async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
     s = st.get_state(chat_id)
@@ -116,31 +142,24 @@ async def on_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
-    st.set_state(chat_id, voice_file_id=voice.file_id, transcript=transcript)
+    st.set_state(chat_id, voice_file_id=voice.file_id)
+    await _generate_and_show_plan(update, chat_id, transcript)
 
-    await update.effective_chat.send_message(
-        f"*Transcript:*\n_{transcript}_\n\nGenerating proposed plan…",
-        parse_mode="Markdown",
-    )
 
-    schedule = load_schedule()
-    try:
-        new_plan = llm_client.generate_plan(schedule, transcript)
-    except Exception as exc:
-        logger.exception("LLM plan generation failed")
+async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id
+    s = st.get_state(chat_id)
+    if s is None:
         await update.effective_chat.send_message(
-            f"Plan generation failed: {exc}\n\nSend /checkin to retry."
+            "No active check-in. Send /checkin to start."
         )
         return
 
-    st.set_state(chat_id, proposed_changes=new_plan)
+    transcript = (update.message.text or "").strip()
+    if not transcript:
+        return
 
-    diff = _format_diff(schedule, new_plan)
-    await update.effective_chat.send_message(
-        diff + "\n\nConfirm to email the PDF, or re-record if anything is wrong.",
-        parse_mode="Markdown",
-        reply_markup=CONFIRM_KEYBOARD,
-    )
+    await _generate_and_show_plan(update, chat_id, transcript)
 
 
 async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

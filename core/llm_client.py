@@ -56,7 +56,7 @@ def generate_plan(schedule: dict, transcript: str) -> dict:
         model=GROQ_MODEL,
         max_tokens=4096,
         temperature=0.2,
-        response_format={"type": "json_schema", "json_schema": PLAN_JSON_SCHEMA},
+        response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_message},

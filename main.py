@@ -36,6 +36,7 @@ ptb_app.add_handler(CommandHandler("start", handlers.start_checkin))
 ptb_app.add_handler(CommandHandler("checkin", handlers.start_checkin))
 ptb_app.add_handler(CallbackQueryHandler(handlers.on_callback))
 ptb_app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handlers.on_voice))
+ptb_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handlers.on_text))
 
 # Init DB at module load — idempotent (CREATE TABLE IF NOT EXISTS), runs once
 # per cold-start container.

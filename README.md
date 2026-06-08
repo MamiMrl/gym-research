@@ -9,7 +9,7 @@ Automated weekly gym progression tracker. The active system is **System B** (Tel
 | **Output** | HTML email + printable plan | PDF attached to email (via Resend) |
 | **Trigger** | Cloud routine `trig_01XUTpwZgjKkJw6VDq4HpZSh`, Sundays 08:00 Berlin | Vercel cron (via `vercel.json`), Sundays 08:00 UTC → GET `/trigger` |
 | **Code** | `legacy_email/` | `main.py`, `bot/`, `core/`, `config/`, `templates/`, `vercel.json` |
-| **Status** | ☠ Retired 2026-06-03 (routine permanently disabled, env lost) | 🟡 Deployed on Vercel, webhook registration pending (as of 2026-06-04) |
+| **Status** | ☠ Retired 2026-06-03 (routine permanently disabled, env lost) | ✅ Live — end-to-end verified 2026-06-08 |
 | **Full docs** | `legacy_email/README.md` + `CLAUDE.md` (System A design appendix) | This file + `CLAUDE.md` (System B header) |
 
 ---
@@ -78,18 +78,10 @@ TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 
 # LLM + ASR — Groq is the sole provider.
-# Llama 3.3 70B for planning (strict JSON schema mode), Whisper turbo for voice transcription.
+# Llama 3.3 70B for planning (json_object mode), Whisper turbo for voice transcription.
 GROQ_API_KEY=gsk_...
-GROQ_MODEL=llama-3.3-70b-versatile           # planner — non-reasoning, supports json_schema strict mode
+GROQ_MODEL=llama-3.3-70b-versatile           # does NOT support json_schema on Groq; json_object used instead
 GROQ_WHISPER_MODEL=whisper-large-v3-turbo    # transcription — ~250× real-time
-
-# Strava — required for cardio/HR ingestion and the HR safety flag.
-# 1. Create an app at https://www.strava.com/settings/api (callback domain: localhost)
-# 2. Run: python3 scripts/strava_oauth.py to get the refresh token
-STRAVA_CLIENT_ID=...
-STRAVA_CLIENT_SECRET=...
-STRAVA_REFRESH_TOKEN=...
-USER_MAX_HR=194                              # blank to disable flag; age-predicted = 220 − age
 
 # PDF generation — PDFShift managed API (50 free conversions/month, no system libs needed)
 # Sign up at pdfshift.io, copy the sk_... key.
@@ -204,14 +196,13 @@ Expected within ~10 seconds:
 
 ```
 /checkin (or Sunday cron → /trigger)
-  → bot prints planned schedule + Strava digest (last 7 days, HR flags if any)
-  → bot: "send a voice memo summarising how the week went"
-  → user sends voice memo (any length — Telegram Opus, auto-detected language)
-  → Whisper transcribes (~1–3 s) → transcript printed back
+  → bot prints planned schedule
+  → user sends voice memo OR plain text message with session notes
+  → (voice) Whisper transcribes (~1–3 s) → transcript printed back
   → Llama 3.3 70B applies progression rules → proposed next-week plan
   → bot shows diff (load deltas, set changes, deload banner) + confirmation card
   → [Confirm & email]  →  PDF (PDFShift)  →  email (Resend)  →  schedule rewritten
-  → [Re-record]        →  clear transcript, wait for a new memo
+  → [Re-record]        →  clear transcript, wait for a new memo or text
 ```
 
 Rules embedded in the LLM system prompt (see `core/prompt.py`):
@@ -317,20 +308,15 @@ Scripts in `legacy_email/` still run locally (paths were rewritten to be relativ
 6. ☑ Vercel project (`gym-research`), GitHub auto-deploy, Neon integration (`neon-cyan-nest`)
 7. ☑ Telegram webhook registered against `gym-research.vercel.app`
 
-**Refactor (2026-06-04 evening, commit `b8c8a05` — code complete):**
-8. ☑ LLM swap: `gpt-oss-20b` → `llama-3.3-70b-versatile`, strict `json_schema` + Pydantic validation
+**Refactor (2026-06-04 evening, commit `b8c8a05`):**
+8. ☑ LLM swap: `gpt-oss-20b` → `llama-3.3-70b-versatile`, `json_object` + Pydantic validation
 9. ☑ Whisper added: `core/transcribe.py` with `whisper-large-v3-turbo`
-10. ☑ Button-tap UI deleted; replaced with `MessageHandler(filters.VOICE | filters.AUDIO)` voice flow + Confirm/Re-record card
-11. ☑ Strava added: `core/strava.py` + `strava_activities` table + HR safety flag
-12. ☑ `scripts/strava_oauth.py` one-time auth helper
-13. ☑ `.env.example` documents the full env-var surface
+10. ☑ Button-tap UI deleted; replaced with voice + text `MessageHandler` + Confirm/Re-record card
 
-**Pending user-side setup (do before next live run):**
-14. ☐ Create Strava API app, run `scripts/strava_oauth.py`, get refresh token
-15. ☐ Decide `USER_MAX_HR` (or omit to disable flagging)
-16. ☐ Neon: `DROP TABLE IF EXISTS checkin_state;` (one-time migration for the new schema)
-17. ☐ Vercel env vars: set `GROQ_MODEL=llama-3.3-70b-versatile`, add `STRAVA_*`, add `USER_MAX_HR`
-18. ☐ Redeploy + end-to-end voice-memo test from Telegram
+**2026-06-08:**
+11. ☑ Strava integration removed — voice/text only flow
+12. ☑ `scripts/test_plan.py` — local smoke-test for plan generation
+13. ☑ End-to-end verified from Telegram
 
 (System A is already retired — no coexistence conflict.)
 

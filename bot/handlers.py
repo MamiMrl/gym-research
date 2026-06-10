@@ -6,7 +6,7 @@ from telegram.ext import ContextTypes
 from bot import state as st
 from bot.keyboards import CONFIRM_KEYBOARD
 from core import llm_client, pdf, transcribe
-from core.email import send_plan_email
+from core.email import send_newsletter
 from core.schedule import load_schedule, save_schedule
 
 logger = logging.getLogger(__name__)
@@ -189,7 +189,8 @@ async def _on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     new_plan = s["proposed_changes"]
-    await update.effective_chat.send_message("Generating PDF and sending email…")
+    transcript = s.get("transcript") or ""
+    await update.effective_chat.send_message("Generating PDF and sending newsletter…")
 
     try:
         pdf_path = pdf.render_pdf(new_plan, output_path="/tmp/plan.pdf")
@@ -198,25 +199,38 @@ async def _on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.effective_chat.send_message(f"PDF render failed: {exc}")
         return
 
+    # Load this-week BEFORE save_schedule overwrites it — the newsletter recap
+    # diffs (this_week → next_week) to compute +kg added, biggest jump, etc.
+    this_week = load_schedule()
+    week_number = st.latest_week_number() + 1
+    used_ids = st.recent_fact_ids(limit=8)
+
     try:
-        send_plan_email(pdf_path, new_plan["week_label"])
+        used_fact_id = send_newsletter(
+            this_week=this_week,
+            next_week=new_plan,
+            transcript=transcript,
+            week_number=week_number,
+            used_fact_ids=used_ids,
+            pdf_path=pdf_path,
+        )
     except Exception as exc:
-        logger.exception("Email send failed")
+        logger.exception("Newsletter send failed")
         await update.effective_chat.send_message(f"Email failed: {exc}")
         return
 
-    schedule = load_schedule()
+    # Persist: schedule_snapshot = the plan that's now active (= new_plan).
+    # That's what GET /plan/{week_number}.pdf will re-render.
     save_schedule(new_plan)
-
-    week_number = st.latest_week_number() + 1
     st.end_checkin(
         chat_id,
         week_number=week_number,
-        schedule=schedule,
-        transcript=s.get("transcript"),
+        schedule=new_plan,
+        transcript=transcript,
+        used_fact_id=used_fact_id,
     )
 
     await update.effective_chat.send_message(
-        f"Done. Week {week_number} plan emailed: *{new_plan['week_label']}*",
+        f"Done. Week {week_number} newsletter sent: *{new_plan['week_label']}*",
         parse_mode="Markdown",
     )

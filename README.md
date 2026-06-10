@@ -8,6 +8,8 @@ Built on: [Groq](https://groq.com) (Llama 3.3 70B + Whisper), Neon Postgres, PDF
 
 The active system is **System B** (Telegram voice-memo bot). System A — an older email-based rule engine — was retired 2026-06-03 and lives in `legacy_email/` for reference.
 
+> 🚧 **In flight (2026-06-10):** the Sunday email is being rebranded into a full weekly newsletter — **"Light Weight."** — with a science fact of the week, last-week recap stats, and a signed PDF download. Design package: `DESIGN-Weekly-Science-Newsletter/`. Build plan: `IMPLEMENTATION-newsletter.md` (temp, deleted on ship). See the [Newsletter](#newsletter-light-weight) section below.
+
 | | System A (retired) | System B (current) |
 |---|---|---|
 | **Channel** | Email reply | Telegram voice memo |
@@ -292,6 +294,40 @@ Vercel's Logs tab shows entries from all deployments, not just the latest. A `li
 Strava call failures are **non-fatal** — the bot logs a warning and proceeds without cardio context. The check-in still works without Strava configured at all (leave `STRAVA_*` env vars unset).
 
 **One-time auth:** run `python3 scripts/strava_oauth.py` locally after putting `STRAVA_CLIENT_ID` + `STRAVA_CLIENT_SECRET` in `.env`. The script opens your browser, catches the OAuth callback on `localhost:8765`, and prints the refresh token to paste into Vercel. Refresh tokens don't expire unless you revoke the app or change scopes — so this is genuinely once.
+
+---
+
+## Newsletter (Light Weight)
+
+> **Status: in flight, 2026-06-10.** The Sunday email currently sends a one-line HTML body + PDF attachment. The newsletter upgrade turns it into a 600px branded email matching `DESIGN-Weekly-Science-Newsletter/Light Weight - Newsletter.html`.
+
+**Brand:** "**LIGHT WEIGHT.**" — BVB black + volt-yellow (`#FDE100`), Bebas Neue display, Archivo body, JetBrains Mono spec. Same visual language as the printed PDF; different layout (rounded cards instead of cut-out stickers).
+
+**Structure per issue:**
+1. **Masthead** — issue number + date.
+2. **Deload strip** (conditional) — when the LLM detects deload triggers.
+3. **Hero photo** — copyright-free B&W gym shot, rotated by issue number.
+4. **Science fact** — one curated fact + citation + "why it matters" copy.
+5. **Last week recap** — 3 stat tiles (sessions, +kg added, skipped) + biggest-jump line.
+6. **This week's plan** — 4 day rows with top set + load (deload markers when applicable).
+7. **Download CTA** — signed URL to re-rendered PDF.
+8. **Footer** — voice-memo reminder + unsubscribe + archive links.
+
+**New files:**
+- `templates/newsletter.html` — Jinja2 email body (inline CSS, table grids, Outlook-safe).
+- `core/newsletter.py` — `build_context(this_week, next_week, transcript, week_number) -> dict`.
+- `core/facts.py` + `data/facts.json` — curated science-fact pool + picker. Rotates, never repeats within the last N issues (tracked in `checkin_history.used_fact_id`).
+- `assets/hero/01.jpg` … `20.jpg` + `assets/hero/README.md` (attribution).
+- `scripts/test_newsletter.py` — local renderer + Mail.app preview.
+
+**Endpoint added:**
+- `GET /plan/{week_number}.pdf?t=<hmac>` — re-renders the PDF from `checkin_history.schedule_snapshot`; HMAC key derived from `CRON_SECRET`. Powers the CTA button. PDF stays attached for offline.
+
+**Schema bump:**
+- `PLAN_JSON_SCHEMA` gains a `status` field per exercise (`as_planned` / `too_easy` / `struggled` / `skipped`) so the recap can compute sessions-done and skipped-count without re-parsing the transcript.
+- `checkin_history` gains `used_fact_id TEXT NULL`.
+
+For the full data shape, phased steps, and email-safe HTML gotchas: see `IMPLEMENTATION-newsletter.md` (temporary — deleted when the newsletter ships).
 
 ---
 

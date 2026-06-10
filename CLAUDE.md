@@ -24,7 +24,9 @@ A weekly gym-progression tracker. The current implementation (**System B**) is a
 │
 ├── legacy_email/              System A — retired 2026-06-03 (see its README.md)
 ├── docs/                      Training plans + scientific references
-└── notes/                     Archived design docs + session history (see below)
+├── notes/                     Archived design docs + session history (see below)
+├── DESIGN-Weekly-Science-Newsletter/   Source assets for the "Light Weight" newsletter (canvas JSX + HTML preview)
+└── IMPLEMENTATION-newsletter.md        ⚠ TEMPORARY — scratch plan for the newsletter build, delete when shipped
 ```
 
 ## Architecture (System B — current)
@@ -37,6 +39,22 @@ A weekly gym-progression tracker. The current implementation (**System B**) is a
 - **PDF:** PDFShift API (`core/pdf.py`) — A4 landscape, Jinja2 template, no system libs. Template: BVB dark theme (black + `#FDE100`), Bebas Neue headers, JetBrains Mono for numbers. **2 pages**: page 1 = all 4 workouts in a 2×2 grid (each card ~134mm × 85mm, cut along the 6mm gap crosshair → 4 notebook-sized stickers); page 2 = 8 run stickers in a 4×2 grid (cut-out). Page size, margins, gap, and per-card dimensions live as constants at the top of `core/pdf.py` and are threaded into the Jinja template — single source of truth, change there only. PDFShift is told `format: "A4", landscape: True` explicitly (CSS `@page` alone is unreliable for orientation). Smoke-test: `python3 -m core.pdf /tmp/plan.pdf && open /tmp/plan.pdf` (needs `PDFSHIFT_API_KEY` in `.env`).
 
 **Current status:** Live on Vercel. End-to-end flow verified 2026-06-08. Email delivery fixed 2026-06-09 (custom domain `mami-gym-bot-update.xyz`). Add `gym@mami-gym-bot-update.xyz` to iCloud contacts to keep out of junk.
+
+## In-flight: "Light Weight" weekly newsletter (2026-06-10)
+
+The bare one-line email body is being upgraded to a full branded newsletter ("**Light Weight.**" — BVB black + volt-yellow, 600px hi-fi design from `DESIGN-Weekly-Science-Newsletter/newsletter-hifi.jsx`). PDF and conversational flow stay unchanged; the email becomes the public face.
+
+**Structure per issue:** Masthead → optional Deload strip → optional hero photo → Science fact of the week → Last-week recap stats → This week's plan rows → Download CTA (signed PDF URL) → Footer.
+
+**Key implementation choices (locked):**
+- **Visual system:** hi-fi (rounded cards, Bebas Neue). Not the elevated/stencil variant.
+- **Brand wordmark:** `LIGHT WEIGHT.` everywhere, yellow period accent. Do not swap to Overload/Tension/Volume.
+- **Fact source:** curated `data/facts.json` (~25 entries, hand-seeded from `docs/golden-encyklopedia-building-muscle.md` + `docs/Gym-planning.md`). No LLM in the fact path; deterministic tag-match + rotation. `checkin_history.used_fact_id` prevents repeats.
+- **Hero photos:** curated `assets/hero/*.jpg` (~15–20 copyright-free B&W gym shots, Unsplash/Pexels). Deterministic rotation by issue number. Attribution in `assets/hero/README.md`.
+- **CTA download:** functional signed URL — `GET /plan/{week_number}.pdf?t=<hmac>` re-renders from `checkin_history.schedule_snapshot` on demand. HMAC key derived from `CRON_SECRET`. PDF stays attached for offline.
+- **LLM schema change:** each exercise in `PLAN_JSON_SCHEMA` gains a `status` field (`as_planned` / `too_easy` / `struggled` / `skipped`) so the recap can compute sessions-done and skipped-count.
+
+**See `IMPLEMENTATION-newsletter.md` for the full phased plan and data shapes. Delete that file once shipped.**
 
 ## Don'ts / critical constraints
 

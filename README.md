@@ -329,6 +329,21 @@ Strava call failures are **non-fatal** — the bot logs a warning and proceeds w
 
 For the full data shape, phased steps, and email-safe HTML gotchas: see `IMPLEMENTATION-newsletter.md` (temporary — deleted when the newsletter ships).
 
+### Future scaling — when "render on click" stops being free
+
+The signed-PDF endpoint re-renders the PDF on every click via PDFShift. That's right-sized for v1 (one subscriber, ~4 clicks/month — well under PDFShift's 50/month free tier) and gives a permanent archive: every past issue's CTA stays alive forever at a stable URL.
+
+If this ever ships to more subscribers, the per-click render becomes the bottleneck (cost + latency). The migration path at that point:
+
+1. **Render once on Confirm**, immediately after the LLM rewrites the plan.
+2. **Cache the PDF** to durable storage — Vercel Blob, Cloudflare R2, or any S3-compatible bucket — keyed by `(week_number, hash(schedule_snapshot))` so a re-issue of the same plan is a no-op.
+3. **CTA points at the blob URL** with a long-lived signed URL or via the existing `/plan/{n}.pdf` endpoint switched to "fetch + stream from blob" instead of "render via PDFShift".
+4. **Endpoint becomes a thin proxy** with caching headers (`Cache-Control: public, max-age=31536000, immutable`) so CDN edges hold the file and PDFShift is hit ~zero times.
+
+The HMAC token logic doesn't change — it still gates which week_number the caller is allowed to fetch. Only the *source* of the PDF bytes flips from "render now" to "read from blob".
+
+Trigger condition: noticeable PDFShift quota pressure, or any subscriber count > ~5 with > 1 click/week per user.
+
 ---
 
 ## System A (retired)

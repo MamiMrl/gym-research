@@ -56,6 +56,8 @@ The bare one-line email body is being upgraded to a full branded newsletter ("**
 
 **See `IMPLEMENTATION-newsletter.md` for the full phased plan and data shapes. Delete that file once shipped.**
 
+**Future-scaling note (do not delete):** the signed-PDF endpoint re-renders on every click via PDFShift. Fine for a single-subscriber v1; if subscriber count grows past ~5 or PDFShift quota tightens, migrate to "render once on Confirm → cache to Vercel Blob / R2 → endpoint streams from blob". The HMAC token logic stays the same; only the byte source flips. Documented in detail in `README.md` § "Future scaling".
+
 ## Don'ts / critical constraints
 
 - **Never name anything `app` or `application` in `main.py`** unless it's the FastAPI ASGI instance. Vercel's Python runtime auto-picks the first match and will mis-bind PTB. PTB stays as `ptb_app`.

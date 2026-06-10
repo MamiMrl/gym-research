@@ -36,6 +36,10 @@ def init_db() -> None:
                 transcript        TEXT
             )
         """)
+        # ALTER stays idempotent — safe to call on every cold boot.
+        conn.execute(
+            "ALTER TABLE checkin_history ADD COLUMN IF NOT EXISTS used_fact_id TEXT"
+        )
 
 
 def start_checkin(chat_id: int) -> None:
@@ -98,13 +102,14 @@ def end_checkin(
     week_number: int,
     schedule: dict,
     transcript: str | None,
+    used_fact_id: str | None = None,
 ) -> None:
     now = datetime.now(timezone.utc).isoformat()
     with _conn() as conn:
         conn.execute(
-            "INSERT INTO checkin_history (week_number, completed_at, schedule_snapshot, transcript)"
-            " VALUES (%s, %s, %s, %s)",
-            (week_number, now, json.dumps(schedule), transcript),
+            "INSERT INTO checkin_history (week_number, completed_at, schedule_snapshot, transcript, used_fact_id)"
+            " VALUES (%s, %s, %s, %s, %s)",
+            (week_number, now, json.dumps(schedule), transcript, used_fact_id),
         )
         conn.execute("DELETE FROM checkin_state WHERE chat_id = %s", (chat_id,))
 
@@ -115,3 +120,30 @@ def latest_week_number() -> int:
             "SELECT COALESCE(MAX(week_number), 0) AS n FROM checkin_history"
         ).fetchone()
     return int(row["n"]) if row else 0
+
+
+def recent_fact_ids(limit: int = 8) -> list[str]:
+    """Most-recent N used_fact_id values, newest first, NULLs excluded.
+    Used by the fact picker to avoid repeats within the recent window."""
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT used_fact_id FROM checkin_history"
+            " WHERE used_fact_id IS NOT NULL"
+            " ORDER BY id DESC LIMIT %s",
+            (limit,),
+        ).fetchall()
+    return [r["used_fact_id"] for r in rows]
+
+
+def get_history_by_week(week_number: int) -> dict | None:
+    """Fetch a historical check-in (used by the signed-PDF endpoint to
+    re-render a past week's plan from the snapshot)."""
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT week_number, completed_at, schedule_snapshot, transcript, used_fact_id"
+            " FROM checkin_history WHERE week_number = %s ORDER BY id DESC LIMIT 1",
+            (week_number,),
+        ).fetchone()
+    if not row:
+        return None
+    return dict(row)

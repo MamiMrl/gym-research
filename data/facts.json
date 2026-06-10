@@ -1,0 +1,252 @@
+[
+  {
+    "id": "frequency-2x-per-week",
+    "tags": ["frequency", "hypertrophy", "split", "volume"],
+    "headline_prefix": "Hitting a muscle ",
+    "highlight": "twice a week",
+    "headline_suffix": " builds roughly 15% more of it than once — at the same weekly volume.",
+    "citation": "Schoenfeld, Ogborn & Krieger (2016) — frequency meta-analysis",
+    "why_it_matters": "Your upper/lower 4-day split is built on exactly this. Don't try to cram all your chest work into Upper A and skim Upper B — the same total sets, split across two days, grow you measurably faster for free.",
+    "deload_safe": true
+  },
+  {
+    "id": "volume-sweet-spot-12-20",
+    "tags": ["volume", "hypertrophy", "sets", "growth"],
+    "headline_prefix": "The hypertrophy sweet spot is ",
+    "highlight": "12 to 20 working sets",
+    "headline_suffix": " per muscle per week — less is leaving gains on the table, more is just fatigue.",
+    "citation": "Schoenfeld et al. (2018) — dose-response volume meta-analysis",
+    "why_it_matters": "Count your weekly sets per muscle. If chest is sitting at 8, add a couple of sets to your Upper B day. If it's already 22, you're not growing more — you're just paying a recovery tax that bleeds into your next lower session.",
+    "deload_safe": true
+  },
+  {
+    "id": "rir-not-failure",
+    "tags": ["RIR", "failure", "intensity", "tired", "fatigue"],
+    "headline_prefix": "Stopping ",
+    "highlight": "1 to 2 reps shy of failure",
+    "headline_suffix": " grows the same muscle as grinding to zero — with a fraction of the recovery cost.",
+    "citation": "Gym-planning.md, synthesizing Schoenfeld hypertrophy research",
+    "why_it_matters": "If today's voice memo says 'felt fried', you don't need to push every set into the redline. Leave 1–2 in the tank on your compounds, save failure for the last set of curls or lateral raises, and you'll show up fresher on Friday's lower day.",
+    "deload_safe": true
+  },
+  {
+    "id": "load-doesnt-matter-light-vs-heavy",
+    "tags": ["load", "reps", "heavy", "light", "joint"],
+    "headline_prefix": "Light and heavy weights build muscle ",
+    "highlight": "equally well",
+    "headline_suffix": " — as long as both sets are taken near failure.",
+    "citation": "Morton et al. / Schoenfeld load-equating studies (golden-encyklopedia-building-muscle.md)",
+    "why_it_matters": "On a day your shoulder or knee is whispering, you don't have to PR. Drop the bar 20% and chase 12 hard reps — the growth is the same. Your joints will thank you next session.",
+    "deload_safe": true
+  },
+  {
+    "id": "double-progression-method",
+    "tags": ["progression", "reps", "overload", "weight"],
+    "headline_prefix": "Add reps each week, then ",
+    "highlight": "jump the bar 5%",
+    "headline_suffix": " once you hit the top of your rep range — that's the entire engine of growth.",
+    "citation": "Gym-planning.md — double-progression method",
+    "why_it_matters": "Pick 6–10 reps. Start at 6, add a rep each session, jump the weight 5% the week you nail 10 across all sets, drop back to 6. Apply this to your bench, row, squat and RDL — it's the simplest way to make sure your plan below isn't the same one you ran last month.",
+    "deload_safe": true
+  },
+  {
+    "id": "rest-between-heavy-sets",
+    "tags": ["rest", "tempo", "heavy", "compound", "form"],
+    "headline_prefix": "Heavy compound sets need ",
+    "highlight": "2 to 3 minutes of rest",
+    "headline_suffix": " — anything less and your next set is a cardio set, not a strength set.",
+    "citation": "Gym-planning.md, Part 8",
+    "why_it_matters": "On your squat and bench in the plan below, don't rush. Wait until your breathing settles. Sixty-second rests feel productive but they cut your working weight by 10–15%, which is exactly the volume-at-intensity you came for.",
+    "deload_safe": true
+  },
+  {
+    "id": "deload-every-4-8-weeks",
+    "tags": ["deload", "recovery", "joint", "plateau", "tired"],
+    "headline_prefix": "A planned deload every ",
+    "highlight": "4 to 8 weeks",
+    "headline_suffix": " — 50–60% volume at the same loads — is what keeps joints, tendons and CNS in the game.",
+    "citation": "Gym-planning.md, Part 6",
+    "why_it_matters": "Deloads aren't weakness, they're how your tendons catch up to your muscles. If you've been pushing the plan below for 5–6 weeks straight and weights feel sticky, this week's lighter sets aren't a setback — they're the reason next block PRs.",
+    "deload_safe": true
+  },
+  {
+    "id": "isometric-tendon-pain-protocol",
+    "tags": ["tendon", "pain", "joint", "shoulder", "elbow", "isometric"],
+    "headline_prefix": "A single bout of isometric holds can drop tendon pain by ",
+    "highlight": "around 87% for 45+ minutes",
+    "headline_suffix": " — five sets of 45 seconds at 70% effort.",
+    "citation": "injury-recovery.md, Part 2",
+    "why_it_matters": "If an elbow or shoulder tendon is barking during warm-ups, do five 45-second holds at a pain-free angle before you lift. You'll get a 45-minute window where pain signaling is quieted enough to train cleanly — and you're rebuilding the tendon in the process.",
+    "deload_safe": true
+  },
+  {
+    "id": "shoulder-avoid-list",
+    "tags": ["shoulder", "pain", "form", "dip", "overhead"],
+    "headline_prefix": "During an angry shoulder, skip ",
+    "highlight": "dips, behind-the-neck presses and deep flyes",
+    "headline_suffix": " — all three load the anterior capsule in exactly the overextended position that hurt you.",
+    "citation": "injury-recovery.md, Part 4",
+    "why_it_matters": "If your shoulder is even whispering this week, sub close-grip bench for dips, a landmine press for any overhead barbell work, and a pec deck with limited stretch for flyes. The plan below already biases this way — don't override it with 'I felt fine warming up'.",
+    "deload_safe": true
+  },
+  {
+    "id": "long-length-bias",
+    "tags": ["range", "stretch", "tempo", "growth"],
+    "headline_prefix": "Training muscles at ",
+    "highlight": "long, stretched lengths",
+    "headline_suffix": " produces more hypertrophy and stronger tendon adaptation than short-range work.",
+    "citation": "injury-recovery.md, Part 2 (long-length bias)",
+    "why_it_matters": "On RDLs, get the bar to mid-shin. On incline curls, let the elbow drift back. On split squats, sink the back knee. The stretched portion of each rep is where the growth actually lives — half-reps build half a muscle.",
+    "deload_safe": true
+  },
+  {
+    "id": "warmup-ramp-protocol",
+    "tags": ["warmup", "joint", "form", "compound"],
+    "headline_prefix": "Before working sets, ramp the bar at ",
+    "highlight": "empty, 50%, 70%, 85%",
+    "headline_suffix": " — five short sets that cost nothing and protect the next 20 minutes of heavy work.",
+    "citation": "injury-recovery.md, Part 9",
+    "why_it_matters": "If you're walking into bench at 80 kg, that's bar × 10, 40 × 5, 55 × 3, 70 × 1, then go. It takes four minutes and it's the difference between a clean working set and tweaking something that costs you a week.",
+    "deload_safe": true
+  },
+  {
+    "id": "sleep-master-recovery",
+    "tags": ["sleep", "recovery", "tired", "rest"],
+    "headline_prefix": "If forced to choose, ",
+    "highlight": "7 to 9 hours of sleep",
+    "headline_suffix": " beats the workout you'd do on six — every single time.",
+    "citation": "injury-recovery.md, Part 8",
+    "why_it_matters": "Deep sleep is when growth hormone peaks, motor patterns lock in, and your nervous system resets. A skipped session at 8 hours of sleep recovers faster than a forced one at 5. If today's memo says 'wrecked, slept badly', that's a real input — push the heavy day a slot.",
+    "deload_safe": true
+  },
+  {
+    "id": "massage-top-recovery-modality",
+    "tags": ["recovery", "sore", "DOMS", "massage"],
+    "headline_prefix": "For soreness and fatigue, ",
+    "highlight": "massage is the #1 modality",
+    "headline_suffix": " — beating ice baths, stretching, stim and compression in head-to-head trials.",
+    "citation": "injury-recovery.md, Part 5 (meta-analysis ranking)",
+    "why_it_matters": "Ten to twenty minutes with a foam roller or gun on quads, hams, lats and pecs after your hardest sessions is the highest-ROI recovery tool available to you. Skip the ice bath unless inflammation is the actual problem — it can blunt the gains you just earned.",
+    "deload_safe": true
+  },
+  {
+    "id": "ice-bath-blunts-gains",
+    "tags": ["recovery", "cold", "ice", "inflammation"],
+    "headline_prefix": "Routine post-lift ice baths can ",
+    "highlight": "blunt muscle and strength gains",
+    "headline_suffix": " — save them for 4+ hours after lifting, or for rest days.",
+    "citation": "injury-recovery.md, Part 5",
+    "why_it_matters": "The inflammation right after a hard set is the signal your body uses to rebuild. Plunging straight after the gym dampens that signal. If you love the cold, take it on Sunday or hours after your session — not as a finisher.",
+    "deload_safe": true
+  },
+  {
+    "id": "concurrent-cardio-interference",
+    "tags": ["cardio", "running", "interference", "lifting"],
+    "headline_prefix": "Cardio in the ",
+    "highlight": "same session as lifting",
+    "headline_suffix": " can blunt muscle and strength gains via mTOR interference — keep them at least 6 hours apart.",
+    "citation": "Coffey & Hawley (2017) — concurrent training review",
+    "why_it_matters": "Keep lifting and hard running on separate days when you can. If you ever stack a run before a lift, you're paying interest on every set that follows. Walking is fine; hard running before squats is not.",
+    "deload_safe": true
+  },
+  {
+    "id": "protein-threshold-1-62",
+    "tags": ["protein", "nutrition", "growth", "diet"],
+    "headline_prefix": "Protein benefits for muscle plateau at ",
+    "highlight": "1.62 g per kg of bodyweight",
+    "headline_suffix": " — past that, you're not growing more, just paying more for groceries.",
+    "citation": "Morton et al. (2017) — protein meta-analysis",
+    "why_it_matters": "Past ~1.6 g/kg, extra protein doesn't add muscle — it just adds expense. Hit the floor every day; stop chasing 250 g.",
+    "deload_safe": true
+  },
+  {
+    "id": "protein-cutting-2-4",
+    "tags": ["protein", "cut", "diet", "recovery"],
+    "headline_prefix": "In a caloric deficit, raise protein to ",
+    "highlight": "2.4 g per kg per day",
+    "headline_suffix": " — that's the dose that shields muscle while fat falls.",
+    "citation": "Longland et al. (2016) — recomposition trial",
+    "why_it_matters": "If you're cutting, the bump to ~2.4 g/kg on training days is the difference between recomp (muscle up, fat down) and just losing weight. Maintenance-day protein can sit a touch lower.",
+    "deload_safe": true
+  },
+  {
+    "id": "minimum-volume-threshold",
+    "tags": ["volume", "minimum", "frequency", "busy"],
+    "headline_prefix": "Even ",
+    "highlight": "6 to 10 hard sets per muscle per week",
+    "headline_suffix": " is enough to grow — anything less and you're maintaining, not building.",
+    "citation": "Schoenfeld et al. (2018) — dose-response",
+    "why_it_matters": "Travel week, sick week, busy week — if you can hit just 6 quality sets per muscle, you're not regressing. Don't skip the gym thinking 'it's not enough to matter'. Two sets of three exercises is plenty to hold the line.",
+    "deload_safe": true
+  },
+  {
+    "id": "rep-range-hypertrophy-sweet-spot",
+    "tags": ["reps", "load", "hypertrophy"],
+    "headline_prefix": "The hypertrophy sweet spot is ",
+    "highlight": "6 to 12 reps at 65–80% 1RM",
+    "headline_suffix": " — heavy enough for tension, light enough to recover.",
+    "citation": "Gym-planning.md, Part 3",
+    "why_it_matters": "This is where your compound work in the plan below should live. Triples are for strength meets, sets of 20 are for finishers. The big middle is where you'll get the most muscle for the least joint cost.",
+    "deload_safe": true
+  },
+  {
+    "id": "warmup-shoulder-prehab",
+    "tags": ["shoulder", "warmup", "prehab", "form"],
+    "headline_prefix": "Five minutes of ",
+    "highlight": "wall slides, external rotations and Y/T/W holds",
+    "headline_suffix": " before pressing is the cheapest shoulder insurance you can buy.",
+    "citation": "injury-recovery.md, Part 9 (shoulder-specific warm-up)",
+    "why_it_matters": "Given your shoulder history, this is non-negotiable before any upper-body day. Wall slides × 10, banded external rotations × 12 each, face pulls × 15, one round of Y/T/W. Then bench. Skip it once and you'll feel it on rep 3 of set 2.",
+    "deload_safe": true
+  },
+  {
+    "id": "failure-only-on-isolation",
+    "tags": ["failure", "RIR", "isolation", "compound"],
+    "headline_prefix": "Save true failure for ",
+    "highlight": "the last set of an isolation lift",
+    "headline_suffix": " — never grind it on bench, squat or deadlift.",
+    "citation": "Gym-planning.md, Part 3",
+    "why_it_matters": "Push the final set of curls, lateral raises and leg extensions into the red. Leave your heavy compounds at 1–2 RIR. Grinding a max-effort bench rep costs you three days of bench progress; grinding a curl costs you nothing.",
+    "deload_safe": true
+  },
+  {
+    "id": "tier-one-exercises-first",
+    "tags": ["compound", "form", "order", "selection"],
+    "headline_prefix": "Do your ",
+    "highlight": "big compound lifts first",
+    "headline_suffix": " — 60–70% of weekly volume should come from squat, deadlift, bench, row and press patterns.",
+    "citation": "Gym-planning.md, Part 7",
+    "why_it_matters": "Open every session with the lift that demands the most. The plan below puts squats and bench up front for exactly this reason. Don't burn out on cable work and then half-rep your main lift — the order on the page is the order to lift in.",
+    "deload_safe": true
+  },
+  {
+    "id": "soreness-not-progress",
+    "tags": ["sore", "DOMS", "recovery", "tired"],
+    "headline_prefix": "Soreness lingering ",
+    "highlight": "past 72 hours",
+    "headline_suffix": " isn't a badge — it's a signal you're under-recovering.",
+    "citation": "injury-recovery.md, Part 6",
+    "why_it_matters": "If you're still walking sore on Thursday from Monday's squats, the answer isn't more protein shakes — it's a deload week or a 200–300 calorie bump for 1–2 weeks. Chronic soreness is volume your body can't pay for.",
+    "deload_safe": true
+  },
+  {
+    "id": "skip-light-warmups-in-volume",
+    "tags": ["volume", "counting", "sets", "warmup"],
+    "headline_prefix": "When counting weekly volume, ",
+    "highlight": "light warm-ups under 50% don't count",
+    "headline_suffix": " — only working sets and heavy warm-ups belong on the tally.",
+    "citation": "Gym-planning.md, Part 2",
+    "why_it_matters": "If you're logging 'chest = 18 sets/week' but six of those are empty-bar bench, your real number is 12. Track honestly. The dose-response curve only knows about the sets that actually challenged the tissue.",
+    "deload_safe": true
+  },
+  {
+    "id": "rehab-reintroduction-criteria",
+    "tags": ["shoulder", "rehab", "return", "pain"],
+    "headline_prefix": "A rehabbed movement is ready to come back only after ",
+    "highlight": "2 weeks pain-free",
+    "headline_suffix": " plus a light session tolerated for two reps in a row.",
+    "citation": "injury-recovery.md, Part 4 (re-introduction criteria)",
+    "why_it_matters": "Don't reintroduce dips or deep flyes the first day they feel okay. Two weeks of no pain in rehab drills, full range restored, then one light session, then a second. Only then load it. Rushing this turns a 4-week rehab into a 4-month one.",
+    "deload_safe": true
+  }
+]

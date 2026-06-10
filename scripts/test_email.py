@@ -12,16 +12,12 @@ import os
 import sys
 from pathlib import Path
 
-# Load .env from repo root
-env_path = Path(__file__).resolve().parent.parent / ".env"
-if env_path.exists():
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, val = line.partition("=")
-            os.environ.setdefault(key.strip(), val.strip())
-else:
-    print(".env not found — make sure env vars are set manually.", file=sys.stderr)
+# Load .env from repo root. Use python-dotenv (already a dep) so quoted
+# values are handled correctly — a hand-rolled splitlines parser leaks
+# literal "quotes" into env vars and Resend rejects the bogus API key.
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import resend  # noqa: E402
 

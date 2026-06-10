@@ -26,14 +26,13 @@ from datetime import date
 from pathlib import Path
 
 # Load .env so APP_BASE_URL, CRON_SECRET, RESEND_API_KEY etc. flow through.
+# Delegating to python-dotenv (already a dependency) so quoted values, escape
+# sequences and shell-style comments after values are handled correctly — a
+# hand-rolled splitlines parser was leaking literal "quotes" into env vars
+# and Resend rejected the bogus key.
 ROOT = Path(__file__).resolve().parent.parent
-env_path = ROOT / ".env"
-if env_path.exists():
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            k, _, v = line.partition("=")
-            os.environ.setdefault(k.strip(), v.strip())
+from dotenv import load_dotenv  # noqa: E402
+load_dotenv(ROOT / ".env")
 
 # Make `core` and `templates` importable when run from anywhere.
 sys.path.insert(0, str(ROOT))
@@ -75,7 +74,12 @@ def main() -> None:
 
     base_url = os.environ.get("APP_BASE_URL", "").rstrip("/")
     if args.send and not base_url:
-        print("WARNING: APP_BASE_URL not set — hero img and CTA href will be broken in the sent email.", file=sys.stderr)
+        print(
+            "WARNING: APP_BASE_URL not set in .env — hero image will not load and "
+            "CTA button will link to '#'. Add APP_BASE_URL=https://<your-app>.vercel.app "
+            "(or http://localhost:8000 for local testing) to .env and re-run.",
+            file=sys.stderr,
+        )
 
     this_week = json.loads((ROOT / "config" / "schedule.json").read_text())
     next_week = _synthesise_next_week(this_week, args.deload)

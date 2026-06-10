@@ -25,8 +25,9 @@ A weekly gym-progression tracker. The current implementation (**System B**) is a
 ├── legacy_email/              System A — retired 2026-06-03 (see its README.md)
 ├── docs/                      Training plans + scientific references
 ├── notes/                     Archived design docs + session history (see below)
-├── DESIGN-Weekly-Science-Newsletter/   Source assets for the "Light Weight" newsletter (canvas JSX + HTML preview)
-└── IMPLEMENTATION-newsletter.md        ⚠ TEMPORARY — scratch plan for the newsletter build, delete when shipped
+├── data/        facts.json — curated science-fact pool for the newsletter (~25 entries)
+├── assets/      hero/*.jpg — curated copyright-free hero photos, rotated per issue
+└── DESIGN-Weekly-Science-Newsletter/   Source assets for the "Light Weight" newsletter (canvas JSX + HTML preview)
 ```
 
 ## Architecture (System B — current)
@@ -37,24 +38,20 @@ A weekly gym-progression tracker. The current implementation (**System B**) is a
 - **ASR:** `whisper-large-v3-turbo` on Groq (`core/transcribe.py`). Text messages bypass transcription and go straight to plan generation.
 - **State:** Neon Postgres via `psycopg` v3 (`bot/state.py`). Tables: `checkin_state`, `checkin_history`. `DATABASE_URL` injected by Vercel–Neon integration.
 - **PDF:** PDFShift API (`core/pdf.py`) — A4 landscape, Jinja2 template, no system libs. Template: BVB dark theme (black + `#FDE100`), Bebas Neue headers, JetBrains Mono for numbers. **2 pages**: page 1 = all 4 workouts in a 2×2 grid (each card ~134mm × 85mm, cut along the 6mm gap crosshair → 4 notebook-sized stickers); page 2 = 8 run stickers in a 4×2 grid (cut-out). Page size, margins, gap, and per-card dimensions live as constants at the top of `core/pdf.py` and are threaded into the Jinja template — single source of truth, change there only. PDFShift is told `format: "A4", landscape: True` explicitly (CSS `@page` alone is unreliable for orientation). Smoke-test: `python3 -m core.pdf /tmp/plan.pdf && open /tmp/plan.pdf` (needs `PDFSHIFT_API_KEY` in `.env`).
+- **Newsletter:** the Sunday email body is the branded **Light Weight** newsletter (`templates/newsletter.html`, hi-fi design from `DESIGN-Weekly-Science-Newsletter/newsletter-hifi.jsx`). Each issue carries: masthead (issue + date) → optional deload strip → hero photo → one curated science fact + citation + "why it matters" → last-week recap (sessions/+kg/skipped + biggest-jump line) → this-week plan rows → signed PDF download CTA → footer. PDF stays attached. Source: `core/email.py` (send_newsletter), `core/newsletter.py` (context builder), `core/facts.py` + `data/facts.json` (curated 25-fact pool with deterministic tag-match picker), `core/hero.py` + `assets/hero/*.jpg` (12 photos, rotated by issue number), `core/signing.py` (HMAC for the CTA URL). `GET /plan/{week_number}.pdf?t=<hmac>` re-renders from `checkin_history.schedule_snapshot` on demand. Smoke-test: `python3 scripts/test_newsletter.py` (dry-run to /tmp + browser preview) or `python3 scripts/test_newsletter.py --send` (real Resend send).
 
-**Current status:** Live on Vercel. End-to-end flow verified 2026-06-08. Email delivery fixed 2026-06-09 (custom domain `mami-gym-bot-update.xyz`). Add `gym@mami-gym-bot-update.xyz` to iCloud contacts to keep out of junk.
+**Current status:** Live on Vercel. End-to-end flow verified 2026-06-08. Email delivery fixed 2026-06-09 (custom domain `mami-gym-bot-update.xyz`). Add `gym@mami-gym-bot-update.xyz` to iCloud contacts to keep out of junk. Newsletter rebrand shipped 2026-06-10.
 
-## In-flight: "Light Weight" weekly newsletter (2026-06-10)
+## Newsletter constraints (do not break)
 
-The bare one-line email body is being upgraded to a full branded newsletter ("**Light Weight.**" — BVB black + volt-yellow, 600px hi-fi design from `DESIGN-Weekly-Science-Newsletter/newsletter-hifi.jsx`). PDF and conversational flow stay unchanged; the email becomes the public face.
-
-**Structure per issue:** Masthead → optional Deload strip → optional hero photo → Science fact of the week → Last-week recap stats → This week's plan rows → Download CTA (signed PDF URL) → Footer.
-
-**Key implementation choices (locked):**
-- **Visual system:** hi-fi (rounded cards, Bebas Neue). Not the elevated/stencil variant.
-- **Brand wordmark:** `LIGHT WEIGHT.` everywhere, yellow period accent. Do not swap to Overload/Tension/Volume.
-- **Fact source:** curated `data/facts.json` (~25 entries, hand-seeded from `docs/golden-encyklopedia-building-muscle.md` + `docs/Gym-planning.md`). No LLM in the fact path; deterministic tag-match + rotation. `checkin_history.used_fact_id` prevents repeats.
-- **Hero photos:** curated `assets/hero/*.jpg` (~15–20 copyright-free B&W gym shots, Unsplash/Pexels). Deterministic rotation by issue number. Attribution in `assets/hero/README.md`.
-- **CTA download:** functional signed URL — `GET /plan/{week_number}.pdf?t=<hmac>` re-renders from `checkin_history.schedule_snapshot` on demand. HMAC key derived from `CRON_SECRET`. PDF stays attached for offline.
-- **LLM schema change:** each exercise in `PLAN_JSON_SCHEMA` gains a `status` field (`as_planned` / `too_easy` / `struggled` / `skipped`) so the recap can compute sessions-done and skipped-count.
-
-**See `IMPLEMENTATION-newsletter.md` for the full phased plan and data shapes. Delete that file once shipped.**
+- **Brand wordmark stays `LIGHT WEIGHT.`** with the yellow period accent. Alternates from the identity board (Overload / Tension / Volume) are explicit non-choices — see `DESIGN-Weekly-Science-Newsletter/identity-boards.jsx`.
+- **Hi-fi is the chosen visual system** (rounded cards, Bebas Neue display). The elevated/stencil variant (`newsletter-elevated.jsx`) is documented but not used.
+- **Facts come from `data/facts.json` only.** No LLM in the fact path — picker is deterministic tag-match against the transcript with repeat-avoidance via `checkin_history.used_fact_id`. When the pool ages out (~25 weeks), top it up by extending the JSON, not by switching to LLM generation.
+- **Hero rotation is deterministic by `issue_number % len(pool)`.** Don't introduce randomness — the cycle is meant to be predictable for the maintainer.
+- **CTA is HMAC-signed via `core/signing.py`.** Token derived from `CRON_SECRET`. Don't shorten below 16 hex chars; don't add expiry (archive use case needs old links to stay alive).
+- **`APP_BASE_URL` must be set** for the hero `<img src>` and CTA `href` to resolve in production. Without it, both fall back gracefully but the email is missing pieces.
+- **Per-exercise `status` field on the LLM is load-bearing** — the recap math (sessions-done, skipped-count) reads from it. The Pydantic model defaults to `as_planned` so legacy plans still validate, but new prompts should always request the field.
+- **Email-safe template rules** (in `templates/newsletter.html`): all CSS inline, tables for layout, `bgcolor=` alongside `style:background` for Outlook, numeric width/height attrs on `<img>` + `<td>`, hidden preheader span first thing in `<body>`. Don't switch to flex/grid — Outlook desktop will fall back to block.
 
 **Future-scaling note (do not delete):** the signed-PDF endpoint re-renders on every click via PDFShift. Fine for a single-subscriber v1; if subscriber count grows past ~5 or PDFShift quota tightens, migrate to "render once on Confirm → cache to Vercel Blob / R2 → endpoint streams from blob". The HMAC token logic stays the same; only the byte source flips. Documented in detail in `README.md` § "Future scaling".
 

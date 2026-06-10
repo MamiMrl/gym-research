@@ -8,7 +8,7 @@ Built on: [Groq](https://groq.com) (Llama 3.3 70B + Whisper), Neon Postgres, PDF
 
 The active system is **System B** (Telegram voice-memo bot). System A — an older email-based rule engine — was retired 2026-06-03 and lives in `legacy_email/` for reference.
 
-> 🚧 **In flight (2026-06-10):** the Sunday email is being rebranded into a full weekly newsletter — **"Light Weight."** — with a science fact of the week, last-week recap stats, and a signed PDF download. Design package: `DESIGN-Weekly-Science-Newsletter/`. Build plan: `IMPLEMENTATION-newsletter.md` (temp, deleted on ship). See the [Newsletter](#newsletter-light-weight) section below.
+> ✅ **Shipped (2026-06-10):** the Sunday email is now the full weekly newsletter — **"Light Weight."** — with a science fact of the week, last-week recap stats, and a signed PDF download. Source design: `DESIGN-Weekly-Science-Newsletter/`. Details: [Newsletter](#newsletter-light-weight) section below.
 
 | | System A (retired) | System B (current) |
 |---|---|---|
@@ -299,35 +299,48 @@ Strava call failures are **non-fatal** — the bot logs a warning and proceeds w
 
 ## Newsletter (Light Weight)
 
-> **Status: in flight, 2026-06-10.** The Sunday email currently sends a one-line HTML body + PDF attachment. The newsletter upgrade turns it into a 600px branded email matching `DESIGN-Weekly-Science-Newsletter/Light Weight - Newsletter.html`.
+The Sunday email is the **Light Weight** weekly newsletter — a 600 px branded email rendered from `templates/newsletter.html`. Source design: `DESIGN-Weekly-Science-Newsletter/newsletter-hifi.jsx` (hi-fi variant).
 
 **Brand:** "**LIGHT WEIGHT.**" — BVB black + volt-yellow (`#FDE100`), Bebas Neue display, Archivo body, JetBrains Mono spec. Same visual language as the printed PDF; different layout (rounded cards instead of cut-out stickers).
 
 **Structure per issue:**
 1. **Masthead** — issue number + date.
 2. **Deload strip** (conditional) — when the LLM detects deload triggers.
-3. **Hero photo** — copyright-free B&W gym shot, rotated by issue number.
+3. **Hero photo** — copyright-free gym shot, rotated deterministically by `issue_number % len(pool)`.
 4. **Science fact** — one curated fact + citation + "why it matters" copy.
 5. **Last week recap** — 3 stat tiles (sessions, +kg added, skipped) + biggest-jump line.
 6. **This week's plan** — 4 day rows with top set + load (deload markers when applicable).
 7. **Download CTA** — signed URL to re-rendered PDF.
 8. **Footer** — voice-memo reminder + unsubscribe + archive links.
 
-**New files:**
-- `templates/newsletter.html` — Jinja2 email body (inline CSS, table grids, Outlook-safe).
-- `core/newsletter.py` — `build_context(this_week, next_week, transcript, week_number) -> dict`.
-- `core/facts.py` + `data/facts.json` — curated science-fact pool + picker. Rotates, never repeats within the last N issues (tracked in `checkin_history.used_fact_id`).
-- `assets/hero/01.jpg` … `20.jpg` + `assets/hero/README.md` (attribution).
-- `scripts/test_newsletter.py` — local renderer + Mail.app preview.
+**Code map:**
+- `templates/newsletter.html` — Jinja2 email body. Inline CSS, `<table>` layout, Outlook-safe.
+- `core/newsletter.py` — `build_context(this_week, next_week, transcript, issue_number, fact, hero, cta_href)` builds the template dict (recap math, top-set picker, subject, preheader).
+- `core/email.py` — `send_newsletter(...)` picks the fact + hero, signs the CTA URL, renders the template, ships through Resend with PDF attachment + plain-text fallback. Returns the picked `fact_id` so `_on_confirm` can persist it.
+- `core/facts.py` + `data/facts.json` — 25 curated facts (citation, "why it matters", deload-safe flag, tag list). `pick_fact()` filters deload-unsafe entries, prefers unused IDs, then tag-matches against the transcript. No LLM in the picker.
+- `core/hero.py` + `assets/hero/01.jpg` … `12.jpg` — deterministic rotation by issue number. Photos are 2.5:1 (1200×480), ≤ 150 KB each.
+- `core/signing.py` — `sign_week(n)` / `verify_week(n, t)`. HMAC-SHA256 with `CRON_SECRET`, 16-hex-char truncation.
+- `bot/handlers.py:_on_confirm` — loads `this_week` *before* `save_schedule`, pulls `recent_fact_ids(limit=8)` for the picker's used-window, calls `send_newsletter`, persists `used_fact_id` + `schedule_snapshot = next_week`.
+- `bot/state.py` — `checkin_history.used_fact_id` column, `recent_fact_ids()` helper, `get_history_by_week()` helper.
+- `scripts/test_newsletter.py` — local dry-run renderer (browser preview) + optional `--send` for live Resend delivery.
 
-**Endpoint added:**
-- `GET /plan/{week_number}.pdf?t=<hmac>` — re-renders the PDF from `checkin_history.schedule_snapshot`; HMAC key derived from `CRON_SECRET`. Powers the CTA button. PDF stays attached for offline.
+**Endpoints:**
+- `GET /plan/{week_number}.pdf?t=<hmac>` — re-renders the PDF from `checkin_history.schedule_snapshot` and streams it back. 403 on bad token, 404 on unknown week.
+- `/static/hero/` — `StaticFiles` mount over `assets/hero/`. The newsletter `<img src>` tags resolve here.
 
-**Schema bump:**
-- `PLAN_JSON_SCHEMA` gains a `status` field per exercise (`as_planned` / `too_easy` / `struggled` / `skipped`) so the recap can compute sessions-done and skipped-count without re-parsing the transcript.
-- `checkin_history` gains `used_fact_id TEXT NULL`.
+**Env var:** `APP_BASE_URL` (e.g. `https://gym-research.vercel.app`). The hero URL and CTA URL are built by prepending this to the relative path. Falls back gracefully when unset, but emails will be missing pieces — set it in Vercel before the first real Sunday cron.
 
-For the full data shape, phased steps, and email-safe HTML gotchas: see `IMPLEMENTATION-newsletter.md` (temporary — deleted when the newsletter ships).
+**Schema bumps:**
+- `PLAN_JSON_SCHEMA` per-exercise `status` field (`as_planned` / `too_easy` / `struggled` / `skipped`) — recap math reads from it.
+- `checkin_history.used_fact_id TEXT NULL` — repeat-avoidance window for the fact picker.
+
+**Smoke-test:**
+```bash
+python3 scripts/test_newsletter.py                # render to /tmp + open in browser
+python3 scripts/test_newsletter.py --deload       # deload variant
+python3 scripts/test_newsletter.py --issue 22     # specific issue (controls hero rotation)
+python3 scripts/test_newsletter.py --send         # real Resend send to YOUR_EMAIL
+```
 
 ### Future vision — multi-tenant trajectory
 

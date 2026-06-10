@@ -329,6 +329,31 @@ Strava call failures are **non-fatal** — the bot logs a warning and proceeds w
 
 For the full data shape, phased steps, and email-safe HTML gotchas: see `IMPLEMENTATION-newsletter.md` (temporary — deleted when the newsletter ships).
 
+### Future vision — multi-tenant trajectory
+
+This is single-tenant by design today (one Telegram bot, one chat ID, one inbox). The product is good enough that friends will ask to be on the list — here's how that grows without forcing them through the Telegram + API-key + Vercel onboarding the maintainer went through.
+
+**Stage 0 — Manual onboarding (now).** A friend asks to subscribe. The maintainer:
+- adds their email to a `users` table (Phase v1 work);
+- types in their starting plan + weights;
+- ferries their weekly voice memo via whatever channel they actually use (WhatsApp voice forward, audio file in iMessage, anything).
+
+Trade-off: zero friction for the friend, all friction on the maintainer. Caps at maybe 3–5 friends before this becomes annoying. **Right answer until at least one friend says "I want this every week, no questions" — that's the signal to invest in self-serve.**
+
+**Stage 1 — Self-serve web (v2).** Landing page + email signup + plan-template picker + magic-link verification. Engine stays the same; only the onboarding surface is new. Voice memos still need a delivery channel — this stage assumes the friend can email an attachment, type their notes, or DM them somewhere the maintainer reads.
+
+**Stage 2 — Browser check-in (v3).** Sunday email carries a magic link → web page with their plan inline + a record button (browser `MediaRecorder` API) + a typed-text fallback. Upload → same Whisper → same LLM → same newsletter. No app to install, no Telegram, no friction on either side beyond an email click. Engine unchanged.
+
+**Stage 3 — Mobile app (eventual pivot).** When the value proposition is clear and the audience is asking, fold the whole flow into a single app:
+- Onboarding becomes a guided wizard (plan templates, body metrics, goals).
+- Weekly check-in is a tap-to-record inside the app — no email, no browser, no signed link.
+- The PDF goes away entirely — the plan lives in-app, with a printable export only if the user wants it. The 2×2 sticker-card layout becomes redundant once the app *is* the workout log.
+- Telegram + email + PDFShift + Resend collapse into one product surface. Cheaper to run, cleaner mental model, easier to grow.
+
+At this point the engine we just built — fact picker, newsletter template, LLM progression rules, PDF endpoint — is no longer the product, it's the back-end of a real consumer app. The hard work was getting the *content* right (the fact pool, the coach voice, the recap math). That carries forward whatever the shipping surface becomes.
+
+**Don't pre-build for stage 3.** Each stage is only justified when the previous one breaks. Going straight to a mobile app before stages 1 and 2 means building the wrong product without ever seeing whether the newsletter format alone is enough.
+
 ### Future scaling — when "render on click" stops being free
 
 The signed-PDF endpoint re-renders the PDF on every click via PDFShift. That's right-sized for v1 (one subscriber, ~4 clicks/month — well under PDFShift's 50/month free tier) and gives a permanent archive: every past issue's CTA stays alive forever at a stable URL.

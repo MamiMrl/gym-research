@@ -207,7 +207,25 @@ def _fact_block(fact: dict) -> dict:
 def _subject(issue_number: int, deload: bool, fact: dict) -> str:
     if deload:
         return f"Light Weight · Issue {issue_number} — Deload week, back off to grow"
-    return f"Light Weight · Issue {issue_number} — {fact['highlight']} beats the alternative"
+    teaser = _subject_teaser(fact)
+    return f"Light Weight · Issue {issue_number} — {teaser}"
+
+
+def _subject_teaser(fact: dict, max_len: int = 60) -> str:
+    """Build a natural-reading subject teaser from the fact's own words.
+
+    Strategy: join prefix + highlight + suffix into the full sentence, then
+    cut at the first 'em-dash break' if present (most facts have a primary
+    clause followed by ' — caveat') — that primary clause is the punchy bit.
+    Soft-truncate at the last word boundary if still too long."""
+    full = f"{fact['headline_prefix']}{fact['highlight']}{fact['headline_suffix']}".strip()
+    for sep in [" — ", " – ", ": "]:
+        if sep in full:
+            full = full.split(sep, 1)[0]
+            break
+    if len(full) > max_len:
+        full = full[:max_len].rsplit(" ", 1)[0].rstrip(" ,.;") + "…"
+    return full
 
 
 def _preheader(deload: bool, fact: dict) -> str:

@@ -58,6 +58,8 @@ The bare one-line email body is being upgraded to a full branded newsletter ("**
 
 **Future-scaling note (do not delete):** the signed-PDF endpoint re-renders on every click via PDFShift. Fine for a single-subscriber v1; if subscriber count grows past ~5 or PDFShift quota tightens, migrate to "render once on Confirm → cache to Vercel Blob / R2 → endpoint streams from blob". The HMAC token logic stays the same; only the byte source flips. Documented in detail in `README.md` § "Future scaling".
 
+**Future-vision note (do not delete):** product trajectory is **stage 0** (single-tenant Telegram) → **stage 1** (manual friend onboarding, maintainer types in their plan + ferries their voice memo) → **stage 2** (landing page + magic-link signup) → **stage 3** (browser-recorded check-ins, no Telegram) → **stage 4** (full mobile app, eliminates Telegram + PDF + email entirely). Engine (LLM rules, facts, newsletter template, PDF) is reusable through stage 3; stage 4 absorbs everything. Don't pre-build past the current stage — each stage is only justified when the previous one breaks. Full detail in `README.md` § "Future vision".
+
 ## Don'ts / critical constraints
 
 - **Never name anything `app` or `application` in `main.py`** unless it's the FastAPI ASGI instance. Vercel's Python runtime auto-picks the first match and will mis-bind PTB. PTB stays as `ptb_app`.

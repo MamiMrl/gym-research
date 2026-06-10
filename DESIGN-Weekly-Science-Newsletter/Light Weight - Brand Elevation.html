@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Light Weight — Brand Elevation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:opsz,wght@10..72,100..900&display=swap" rel="stylesheet" crossorigin="anonymous" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" crossorigin="anonymous" />
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #EAE8E0; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="image-slot.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="newsletter-elevated.jsx"></script>
+<script type="text/babel" src="identity-boards.jsx"></script>
+
+<script type="text/babel">
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "name": "LIGHT WEIGHT",
+    "week": "normal",
+    "accent": "#FDE100"
+  }/*EDITMODE-END*/;
+
+  function NewsletterEL({ accent, name, deload }) {
+    return (
+      <div style={{ background: EL.paper, minHeight: '100%' }}>
+        <MastheadEL accent={accent} name={name} />
+        {deload && <DeloadStrip accent={accent} />}
+        <HeroEL accent={accent} deload={deload} />
+        <ScienceEL accent={accent} />
+        <RecapEL accent={accent} deload={deload} />
+        <PlanEL accent={accent} deload={deload} />
+        <CtaEL accent={accent} />
+        <FooterEL accent={accent} name={name} />
+      </div>
+    );
+  }
+
+  function App() {
+    const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+    const accent = t.accent;
+    const deload = t.week === 'deload';
+    const name = t.name;
+
+    return (
+      <div>
+        <DesignCanvas>
+          <DCSection id="identity" title="Identity — name &amp; system"
+            subtitle="Volt rationed · stencil display · hairline craft. Pick a name in Tweaks — the newsletter follows.">
+            <DCArtboard id="names" label="Name candidates" width={560} height={860}>
+              <NamesBoard accent={accent} />
+            </DCArtboard>
+            <DCArtboard id="system" label="The system" width={560} height={860}>
+              <SystemBoard accent={accent} />
+            </DCArtboard>
+          </DCSection>
+          <DCSection id="newsletter" title="The newsletter — elevated"
+            subtitle="600px email · same structure, new skin · drop a photo on the hero">
+            <DCArtboard id="elevated" label={deload ? 'Issue 012 — Deload' : 'Issue 012'} width={600} height={1868}>
+              <NewsletterEL accent={accent} name={name} deload={deload} />
+            </DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+
+        <TweaksPanel>
+          <TweakSection label="Name" />
+          <TweakSelect label="Wordmark" value={t.name}
+            options={[
+              { value: 'LIGHT WEIGHT', label: 'Light Weight (keep)' },
+              { value: 'OVERLOAD', label: 'Overload' },
+              { value: 'TENSION', label: 'Tension' },
+              { value: 'VOLUME', label: 'Volume' },
+            ]}
+            onChange={(v) => setTweak('name', v)} />
+          <TweakSection label="Week state" />
+          <TweakRadio label="This week" value={t.week}
+            options={[{ value: 'normal', label: 'Normal' }, { value: 'deload', label: 'Deload' }]}
+            onChange={(v) => setTweak('week', v)} />
+          <TweakSection label="Volt ration" />
+          <TweakColor label="Accent" value={t.accent}
+            options={['#E3CF00', '#FDE100', '#C9A227']}
+            onChange={(v) => setTweak('accent', v)} />
+        </TweaksPanel>
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

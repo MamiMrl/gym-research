@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Light Weight — Weekly Newsletter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,500&family=Bebas+Neue&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #E7E5DF; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  /* inbox preview backdrop */
+  .stage { padding: 40px 20px 80px; display: flex; flex-direction: column; align-items: center; }
+  .preheader { width: 600px; max-width: 100%; margin: 0 auto 16px; }
+  .ph-row { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #6b6b63; letter-spacing: .02em; line-height: 1.7; }
+  .ph-row b { color: #121210; font-weight: 600; }
+  .email { width: 600px; max-width: 100%; background: #fff; border-radius: 4px; overflow: hidden;
+           box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 24px 60px -18px rgba(0,0,0,.30); }
+  @media (max-width: 640px) { .stage { padding: 20px 0 60px; } .preheader { padding: 0 16px; } .email { border-radius: 0; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="image-slot.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="newsletter-hifi.jsx"></script>
+
+<script type="text/babel">
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "accent": "#FDE100",
+    "week": "normal",
+    "showHero": true
+  }/*EDITMODE-END*/;
+
+  function App() {
+    const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+    const accent = t.accent;
+    const deload = t.week === 'deload';
+
+    return (
+      <div className="stage">
+        <div className="preheader">
+          <div className="ph-row"><b>Light Weight</b> &lt;coach@lightweight.fit&gt;</div>
+          <div className="ph-row">
+            <b>{deload ? 'Issue 12 · Deload week — back off to grow' : 'Issue 12 · 2× beats 1× — and your week is ready'}</b>
+          </div>
+        </div>
+
+        <div className="email">
+          <MastheadLW accent={accent} />
+          {deload && <DeloadBanner accent={accent} />}
+          {t.showHero && <HeroPhoto accent={accent} />}
+          <FactBlock accent={accent} />
+          <RecapBlock accent={accent} deload={deload} />
+          <PlanBlock accent={accent} deload={deload} />
+          <CtaBlock accent={accent} />
+          <FooterLW accent={accent} />
+        </div>
+
+        <TweaksPanel>
+          <TweakSection label="Week state" />
+          <TweakRadio label="This week" value={t.week}
+            options={[{ value: 'normal', label: 'Normal' }, { value: 'deload', label: 'Deload' }]}
+            onChange={(v) => setTweak('week', v)} />
+          <TweakSection label="Brand accent" />
+          <TweakColor label="Accent" value={t.accent}
+            options={['#FDE100', '#00E0A4', '#FF4A1C', '#3B82F6']}
+            onChange={(v) => setTweak('accent', v)} />
+          <TweakSection label="Layout" />
+          <TweakToggle label="Hero photo" value={t.showHero}
+            onChange={(v) => setTweak('showHero', v)} />
+        </TweaksPanel>
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,6 +1,12 @@
-# gym-research
+# gym-progression-bot
 
-Automated weekly gym progression tracker. The active system is **System B** (Telegram voice-memo bot, Llama 3.3 70B + Whisper on Groq, Strava ingestion, PDF emailed weekly). System A — the original email-based tracker — was **retired on 2026-06-03** and lives in `legacy_email/` for reference only.
+Send a voice memo after your Sunday workout. Get next week's plan as a PDF in your inbox.
+
+**gym-progression-bot** is a self-hosted Telegram bot that replaces manual spreadsheet tracking. Record a 30-second voice note describing how each session went — too easy, struggled, skipped a set — and the bot transcribes it, applies progressive overload rules, and emails you a ready-to-print PDF plan for the week ahead.
+
+Built on: [Groq](https://groq.com) (Llama 3.3 70B + Whisper), Neon Postgres, PDFShift, Resend, Vercel.
+
+The active system is **System B** (Telegram voice-memo bot). System A — an older email-based rule engine — was retired 2026-06-03 and lives in `legacy_email/` for reference.
 
 | | System A (retired) | System B (current) |
 |---|---|---|
@@ -9,7 +15,7 @@ Automated weekly gym progression tracker. The active system is **System B** (Tel
 | **Output** | HTML email + printable plan | PDF attached to email (via Resend) |
 | **Trigger** | Cloud routine `trig_01XUTpwZgjKkJw6VDq4HpZSh`, Sundays 08:00 Berlin | Vercel cron (via `vercel.json`), Sundays 08:00 UTC → GET `/trigger` |
 | **Code** | `legacy_email/` | `main.py`, `bot/`, `core/`, `config/`, `templates/`, `vercel.json` |
-| **Status** | ☠ Retired 2026-06-03 (routine permanently disabled, env lost) | ✅ Live — end-to-end verified 2026-06-08 |
+| **Status** | ☠ Retired 2026-06-03 | ✅ Working — deploy your own fork in ~30 min |
 | **Full docs** | `legacy_email/README.md` + `CLAUDE.md` (System A design appendix) | This file + `CLAUDE.md` (System B header) |
 
 ---
@@ -37,14 +43,14 @@ Automated weekly gym progression tracker. The active system is **System B** (Tel
 ├── core/
 │   ├── schedule.py            Load/save config/schedule.json
 │   ├── prompt.py              System prompt + per-week prompt builder
-│   ├── llm_client.py          Groq llama-3.3-70b-versatile (strict JSON schema + Pydantic validation)
+│   ├── llm_client.py          Groq llama-3.3-70b-versatile (json_object + Pydantic validation)
 │   ├── transcribe.py          Groq whisper-large-v3-turbo (voice memo → text)
-│   ├── strava.py              Strava OAuth refresh + recent-activity fetch + HR safety flag
 │   ├── pdf.py                 Jinja2 render → PDFShift API → PDF bytes
 │   └── email.py               Resend send w/ base64 PDF attachment
-├── config/schedule.json       The weekly plan (LLM rewrites this on submit)
-├── scripts/strava_oauth.py    One-time helper: get a Strava refresh token (local)
-├── templates/plan.html        Jinja2 A4 PDF template
+├── config/schedule.json       The weekly plan — seed with your own exercises and loads
+├── scripts/test_plan.py       Local smoke-test for plan generation
+├── scripts/test_email.py      Local smoke-test for email delivery
+├── templates/plan.html        Jinja2 A4-landscape PDF template (2×2 workout grid + run-sticker page)
 ├── .github/workflows/checkin.yml   Manual workflow_dispatch fallback (cron handled by Vercel)
 │
 ├── # ── System A (retired 2026-06-03, archived for reference) ──
@@ -93,8 +99,8 @@ DATABASE_URL=postgresql://...
 
 # Email
 RESEND_API_KEY=re_...
-RESEND_FROM=onboarding@resend.dev            # Resend sandbox sender (no custom domain needed)
-YOUR_EMAIL=mami.maral@icloud.com
+RESEND_FROM=you@yourdomain.com               # Must use a verified custom domain (see Email setup below)
+YOUR_EMAIL=you@yourdomain.com               # Where the weekly PDF gets sent
 
 # Cron auth — Vercel injects this automatically as Authorization: Bearer <CRON_SECRET>
 # on every cron call. Generate with: openssl rand -hex 16
@@ -141,7 +147,7 @@ curl -F "url=https://<ngrok-id>.ngrok.app/webhook" \
 
 ### Deploy to Vercel
 
-The project is deployed at **`https://gym-research.vercel.app`** via the `MamiMrl/gym-research` GitHub repo (auto-deploys on every push to `main`). Platform: Vercel Hobby (free tier), Python ASGI, Git-connected.
+Fork this repo, push to GitHub, and connect it to Vercel — auto-deploys on every push to `main`. Platform: Vercel Hobby (free tier), Python ASGI, Git-connected.
 
 To redeploy manually or set up a fork:
 
@@ -152,12 +158,12 @@ vercel link          # connect local repo to the Vercel project
 vercel deploy --prod
 ```
 
-Secrets are managed in the Vercel dashboard (Settings → Environment Variables). Required keys: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GROQ_API_KEY`, `GROQ_MODEL`, `CRON_SECRET`, `RESEND_API_KEY`, `RESEND_FROM`, `YOUR_EMAIL`, `PDFSHIFT_API_KEY`. `DATABASE_URL` is injected automatically by the Neon Postgres integration (Storage tab → neon-cyan-nest).
+Secrets are managed in the Vercel dashboard (Settings → Environment Variables). Required keys: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GROQ_API_KEY`, `GROQ_MODEL`, `CRON_SECRET`, `RESEND_API_KEY`, `RESEND_FROM`, `YOUR_EMAIL`, `PDFSHIFT_API_KEY`. `DATABASE_URL` is injected automatically by the Neon Postgres integration.
 
 After a fresh deploy, register the Telegram webhook:
 
 ```bash
-curl -F "url=https://gym-research.vercel.app/webhook" \
+curl -F "url=https://<your-app>.vercel.app/webhook" \
      "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook"
 ```
 
@@ -187,7 +193,7 @@ curl https://<app>.vercel.app/trigger \
 ```
 
 Expected within ~10 seconds:
-1. Telegram DM with this week's planned schedule and (if Strava is configured) the past-7-days cardio digest + any HR safety flags.
+1. Telegram DM with this week's planned schedule.
 2. Bot asks for a **voice memo** summarising how each session went.
 3. After you send the memo: bot replies with the transcript, then "Generating proposed plan…", then a diff showing next week's loads + a confirmation card (`Confirm & email` / `Re-record`).
 4. Tap **Confirm** → email from `RESEND_FROM` with `plan-<week>.pdf` attached, `config/schedule.json` rewritten on the server, check-in archived to `checkin_history`.
@@ -318,71 +324,66 @@ Scripts in `legacy_email/` still run locally (paths were rewritten to be relativ
 12. ☑ `scripts/test_plan.py` — local smoke-test for plan generation
 13. ☑ End-to-end verified from Telegram
 
+**2026-06-09 — print layout for pocket-notebook glue-in:**
+14. ☑ PDF switched to **A4 landscape** with all 4 workouts on page 1 in a 2×2 grid, page 2 = 8 run stickers in a 4×2 grid. Each workout card is ~134mm × 85mm — cut along the 6mm grid gap (one horizontal + one vertical cut) and glue into a notebook (max ~140mm wide).
+15. ☑ Layout constants (`PAGE_WIDTH_MM`, `PAGE_HEIGHT_MM`, `PAGE_MARGIN_MM`, `GRID_GAP_MM`, `TABLE_WIDTH_MM`, `TABLE_HEIGHT_MM`) live at the top of `core/pdf.py` and are threaded into `templates/plan.html` via Jinja context — single source of truth.
+16. ☑ PDFShift API call passes `"format": "A4", "landscape": True` explicitly — CSS `@page size` alone is unreliable for orientation (PDFShift silently defaults to A4 portrait without it).
+
 (System A is already retired — no coexistence conflict.)
 
 ---
 
 ## Contributing
 
-This is a personal project owned by **MamiMrl** (Mami Maral, `mami.maral@icloud.com`). Outside contributions are welcome via PR.
+PRs are welcome. This is designed to be forkable — the entire bot is ~500 LOC across `bot/`, `core/`, and `main.py`.
 
 ### 1. Set your git identity before your first commit
 
-Commits are only attributed to a GitHub account when the **author email matches a verified email on that account**. If you clone with a stale global config, your commits can end up attributed to someone else (this actually happened on this repo — 13 commits authored as `hberkecelik@gmail.com` were attributed to the wrong GitHub user until history was rewritten on 2026-06-04).
-
-Set your identity *per-repo* right after cloning:
+Set your identity *per-repo* right after cloning so commits are attributed to your GitHub account:
 
 ```bash
-git clone https://github.com/MamiMrl/gym-research.git
-cd gym-research
+git clone https://github.com/<you>/gym-progression-bot.git
+cd gym-progression-bot
 git config user.name  "<your GitHub username>"
 git config user.email "<email verified on your GitHub account>"
 ```
-
-Verify with `git config user.email` and `git log -1 --pretty=format:'%ae'` after your first commit.
 
 ### 2. Branching and PRs
 
 - `main` is the deploy branch — every push to `main` triggers a production Vercel deploy.
 - For non-trivial changes, open a PR from a feature branch (`feat/...`, `fix/...`, `docs/...`). Vercel creates a preview deployment per PR — check it before merging.
 - Direct pushes to `main` are fine for docs-only or one-line config fixes.
-- Never force-push `main` without coordinating — it invalidates everyone else's clones and the Vercel deploy history.
 
 ### 3. Pre-push checklist
 
 - `python -m py_compile $(git diff --name-only --cached | grep '\.py$')` — every committed `.py` file must compile.
-- `.env` is in `.gitignore` and must stay there. Never commit secrets, even if "just for testing."
+- `.env` is in `.gitignore` and must stay there. Never commit secrets.
 - If you change `bot/state.py` schema, remember psycopg v3 = **one statement per `execute()` call** (one `conn.execute(...)` per `CREATE TABLE`).
 - If you change anything in `main.py`, do NOT name a variable `app` or `application` unless it's the FastAPI instance (see Troubleshooting → ASGI entrypoint).
 - For UI/PDF changes, render locally with `python -m core.pdf /tmp/plan.pdf` before pushing.
+- For LLM prompt changes, run `python3 scripts/test_plan.py` before pushing.
 
-### 4. Infra ownership
+### 4. Services you need to set up (all free tiers are sufficient)
 
-All third-party accounts are owned by **MamiMrl**. Ask for an invite if you need direct access; otherwise route changes through a PR.
-
-| Service | Purpose | Who has access |
+| Service | Purpose | Sign up |
 |---|---|---|
-| Vercel project `gym-research` | Hosting + cron | MamiMrl |
-| Neon Postgres `neon-cyan-nest` | State + history | MamiMrl (auto-linked via Vercel integration) |
-| Groq (`GROQ_API_KEY`) | LLM | MamiMrl |
-| PDFShift (`PDFSHIFT_API_KEY`) | PDF rendering (50/mo free) | MamiMrl |
-| Resend (`RESEND_API_KEY`) | Email delivery | MamiMrl (sandbox sender `onboarding@resend.dev`) |
-| Telegram bot (`TELEGRAM_BOT_TOKEN`) | Conversation channel | MamiMrl (created via @BotFather) |
+| Vercel | Hosting + cron | vercel.com |
+| Neon Postgres | State + history | neon.tech (connect via Vercel integration) |
+| Groq | Llama 3.3 70B + Whisper | console.groq.com |
+| PDFShift | PDF rendering (50/mo free) | pdfshift.io |
+| Resend | Email delivery | resend.com — **requires a verified custom domain** |
+| Telegram bot | Conversation channel | @BotFather on Telegram |
 
-### 5. Pulling environment for local dev
+### 5. Email setup — custom domain required
 
-Don't copy secrets out of band. Once you've been added to the Vercel project:
+`onboarding@resend.dev` (Resend's shared sandbox) is **not suitable for production**: it can only deliver to the Resend account owner's email and is silently dropped by iCloud. You need a verified custom domain:
 
-```bash
-vercel link        # connect this local repo to the Vercel project
-vercel env pull .env
-```
-
-This writes the full prod `.env` locally. If you're not on the Vercel project, ask MamiMrl for read-only values (you don't need most of them for code-only changes — `py_compile` plus a unit-level smoke test of the changed module is usually enough).
+1. Register any cheap domain (`.xyz` costs ~€0.57/yr on Namecheap).
+2. Add it to Resend → Domains. Resend gives you DKIM, SPF, and DMARC DNS records to paste into your registrar.
+3. Set `RESEND_FROM=you@yourdomain.com` in Vercel env vars.
 
 ### 6. Where to look next
 
-- **What each system does and why** → top of this README + `CLAUDE.md` System B header.
-- **What's in flight right now / known broken / fresh-start checklist** → `CLAUDE.md` → "What's left to do for System B — fresh start checklist".
-- **Why we made a given migration choice** (Railway → Vercel, WeasyPrint → PDFShift, SQLite → Neon) → `CLAUDE.md` session history.
-- **System A algorithm and research basis** → `CLAUDE.md` "System A — Full design docs" + `legacy_email/README.md`.
+- **Architecture and constraints** → `CLAUDE.md`
+- **Why we made specific migration choices** (Railway → Vercel, WeasyPrint → PDFShift, SQLite → Neon) → `notes/system-b-history.md`
+- **System A (retired rule engine)** → `legacy_email/README.md`

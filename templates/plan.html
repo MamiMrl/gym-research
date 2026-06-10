@@ -2,40 +2,223 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    @page { size: A4 portrait; margin: 18mm 16mm; }
-    body { font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 11pt; color: #1a1a1a; }
-    h1 { font-size: 15pt; font-weight: 600; margin: 0 0 4px; }
-    .week-label { font-size: 10pt; color: #666; margin-bottom: 20px; }
-    .session { margin-bottom: 22px; page-break-inside: avoid; }
-    .session-header { font-size: 12pt; font-weight: 600; border-bottom: 2px solid #1a1a1a; padding-bottom: 4px; margin-bottom: 8px; }
-    table { width: 100%; border-collapse: collapse; }
-    th { text-align: left; font-size: 9pt; font-weight: 600; text-transform: uppercase;
-         letter-spacing: .05em; color: #555; border-bottom: 1px solid #ddd; padding: 4px 6px; }
-    td { padding: 7px 6px; border-bottom: 1px solid #eee; font-size: 10.5pt; vertical-align: top; }
-    .col-exercise { width: 38%; }
-    .col-sets     { width: 10%; text-align: center; }
-    .col-reps     { width: 10%; text-align: center; }
-    .col-load     { width: 14%; text-align: center; }
-    .col-actual   { width: 14%; }
-    .col-note     { width: 14%; font-size: 9.5pt; color: #555; }
-    .actual-box   { border-bottom: 1px solid #aaa; min-width: 48px; display: inline-block; }
+    * { box-sizing: border-box; margin: 0; padding: 0;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important; }
+
+    @page { size: A4 landscape; margin: {{ page_margin_mm }}mm; }
+
+    body {
+      font-family: 'Inter', -apple-system, Helvetica, Arial, sans-serif;
+      font-size: 10pt;
+      color: #f0f0f0;
+      background: #1a1a1a;
+    }
+
+    .page-break { page-break-before: always; }
+
+    /* ── Page header (slim — keeps room for cards) ── */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1.5px solid #FDE100;
+      padding-bottom: 2mm;
+      margin-bottom: 3mm;
+    }
+    .week-title {
+      font-family: 'Bebas Neue', Impact, sans-serif;
+      font-size: 16pt;
+      color: #FDE100;
+      letter-spacing: 0.05em;
+      line-height: 1;
+    }
+    .generated-date {
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 8pt;
+      color: #888;
+    }
+
+    /* ── Deload banner ── */
+    .deload-banner {
+      background: #FDE100;
+      color: #1a1a1a;
+      font-family: 'Bebas Neue', Impact, sans-serif;
+      font-size: 10pt;
+      letter-spacing: 0.1em;
+      padding: 2mm 3mm;
+      margin-bottom: 3mm;
+    }
+
+    /* ── 2×2 workout grid ── */
+    .workout-grid {
+      display: grid;
+      grid-template-columns: {{ table_width_mm }}mm {{ table_width_mm }}mm;
+      grid-template-rows: {{ table_height_mm }}mm {{ table_height_mm }}mm;
+      gap: {{ grid_gap_mm }}mm;
+    }
+
+    /* Hard-size each card and clip any overflow — prevents a long exercise
+       name from inflating a row and pushing the bottom row onto page 2. */
+    .session {
+      width: {{ table_width_mm }}mm;
+      height: {{ table_height_mm }}mm;
+      overflow: hidden;
+      page-break-inside: avoid;
+    }
+
+    table {
+      width: 100%;
+      height: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      background: #1a1a1a;
+    }
+
+    /* Day-name row — first row of each session table; cuts cleanly with the rest */
+    th.day-row {
+      font-family: 'Bebas Neue', Impact, sans-serif;
+      font-size: 14pt;
+      letter-spacing: 0.07em;
+      color: #1a1a1a;
+      background: #FDE100;
+      text-align: left;
+      text-transform: none;
+      padding: 2mm 3mm;
+      border-bottom: none;
+    }
+
+    th {
+      text-align: left;
+      font-size: 7.5pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: #FDE100;
+      border-bottom: 1px solid rgba(253,225,0,0.25);
+      padding: 1.5mm 2mm;
+    }
+    td {
+      padding: 1.5mm 2mm;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 9.5pt;
+      vertical-align: middle;
+      overflow: hidden;
+    }
+    td.num {
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 9pt;
+      color: #e0e0e0;
+    }
+    td.note-cell { font-size: 8pt; color: #999; }
+
+    .col-exercise { width: 36%; }
+    .col-sets     { width: 9%;  text-align: center; }
+    .col-reps     { width: 12%; text-align: center; }
+    .col-load     { width: 13%; text-align: center; }
+    .col-actual   { width: 15%; }
+    .col-note     { width: 15%; }
+
+    .actual-box {
+      border-bottom: 1px solid rgba(253,225,0,0.45);
+      min-width: 14mm;
+      display: inline-block;
+    }
+
+    /* ── Crop marks at grid gaps (cut paths) ── */
+    .crop-mark {
+      position: absolute;
+      color: #FDE100;
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 9pt;
+      line-height: 1;
+    }
+
+    /* ── Run sticker page ── */
+    .sticker-page-header {
+      font-family: 'Bebas Neue', Impact, sans-serif;
+      font-size: 16pt;
+      color: #FDE100;
+      letter-spacing: 0.07em;
+      border-bottom: 1.5px solid rgba(253,225,0,0.4);
+      padding-bottom: 2mm;
+      margin-bottom: 4mm;
+    }
+
+    .sticker-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: {{ grid_gap_mm }}mm;
+    }
+
+    .sticker {
+      border: 1.5px dashed rgba(253,225,0,0.55);
+      padding: 3mm 4mm;
+      height: 78mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: #111;
+    }
+
+    .sticker-run-label {
+      font-family: 'Bebas Neue', Impact, sans-serif;
+      font-size: 22pt;
+      color: #FDE100;
+      letter-spacing: 0.12em;
+      line-height: 1;
+    }
+
+    .sticker-field {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      font-size: 9pt;
+      color: #888;
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+    }
+
+    .sticker-line {
+      flex: 1;
+      border-bottom: 1px solid rgba(253,225,0,0.35);
+      margin-left: 2px;
+    }
+
+    .cut-hint {
+      font-size: 7pt;
+      color: #555;
+      text-align: center;
+      margin-top: 4mm;
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      letter-spacing: 0.05em;
+    }
   </style>
 </head>
 <body>
-  <h1>Week {{ week_label }}</h1>
-  <div class="week-label">Generated {{ generated_date }}</div>
 
-  {% for session in sessions %}
+<!-- ════ PAGE 1 — All 4 workout stickers ════ -->
+<div class="page-header">
+  <div class="week-title">Week {{ week_label }}</div>
+  <div class="generated-date">{{ generated_date }}</div>
+</div>
+
+{% if deload %}
+<div class="deload-banner">⚠ Deload Week{% if deload_reason %} — {{ deload_reason }}{% endif %}</div>
+{% endif %}
+
+<div class="workout-grid">
+{% for session in sessions[:4] %}
   <div class="session">
-    <div class="session-header">{{ session.day }} — {{ session.label }}</div>
     <table>
       <thead>
+        <tr><th colspan="6" class="day-row">{{ session.day }} — {{ session.label }}</th></tr>
         <tr>
           <th class="col-exercise">Exercise</th>
           <th class="col-sets">Sets</th>
           <th class="col-reps">Reps</th>
-          <th class="col-load">Load (kg)</th>
+          <th class="col-load">kg</th>
           <th class="col-actual">Actual</th>
           <th class="col-note">Note</th>
         </tr>
@@ -44,16 +227,36 @@
         {% for ex in session.exercises %}
         <tr>
           <td class="col-exercise">{{ ex.name }}</td>
-          <td class="col-sets">{{ ex.sets }}</td>
-          <td class="col-reps">{{ ex.reps }}</td>
-          <td class="col-load">{{ ex.load_kg if ex.load_kg else '—' }}</td>
-          <td class="col-actual"><span class="actual-box">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td>
-          <td class="col-note">{{ ex.note }}</td>
+          <td class="col-sets num">{{ ex.sets }}</td>
+          <td class="col-reps num">{{ ex.reps }}</td>
+          <td class="col-load num">{{ ex.load_kg if ex.load_kg else '—' }}</td>
+          <td class="col-actual"><span class="actual-box">&nbsp;</span></td>
+          <td class="col-note note-cell">{{ ex.note }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  {% endfor %}
+{% endfor %}
+</div>
+
+
+<!-- ════ PAGE 2 — Run stickers ════ -->
+<div class="page-break">
+  <div class="sticker-page-header">Run Stickers</div>
+  <div class="sticker-grid">
+    {% for i in range(8) %}
+    <div class="sticker">
+      <div class="sticker-run-label">RUN</div>
+      <div class="sticker-field">Date <span class="sticker-line"></span></div>
+      <div class="sticker-field">km&nbsp;&nbsp; <span class="sticker-line"></span></div>
+      <div class="sticker-field">Pace <span class="sticker-line"></span></div>
+      <div class="sticker-field">Feel <span class="sticker-line"></span></div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="cut-hint">✂ &nbsp; cut along dashed lines &nbsp; ✂</div>
+</div>
+
 </body>
 </html>

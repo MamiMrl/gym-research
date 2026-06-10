@@ -33,3 +33,7 @@ Workout_Plan_Week_*.html
 # Environment
 .env
 .env.local
+.vercel
+
+# Design source zips (unpacked folder is committed instead)
+DESIGN-*.zip

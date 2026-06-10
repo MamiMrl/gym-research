@@ -32,6 +32,9 @@ class _Exercise(BaseModel):
     reps: str
     load_kg: float | None
     note: str = ""
+    # Default keeps legacy plans (pre-status) and quiet exercises (not mentioned
+    # in the transcript) flowing through validation as "no change reported".
+    status: str = "as_planned"
 
 
 class _Session(BaseModel):

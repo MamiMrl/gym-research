@@ -42,6 +42,12 @@ OUTPUT RULES
 ═══════════════════════════════════════
 
 - Keep the same session structure (same days, same exercise order, same exercise names).
+- For each exercise, also emit a "status" field reflecting what the user reported in the transcript:
+  - "as_planned" — no mention, or user said "as planned" / "fine" / "normal"
+  - "too_easy" — user said too light, easy, had reps left, or felt under-stimulated
+  - "struggled" — user said form broke, RIR 0, had to rack early, last rep ugly
+  - "skipped" — user explicitly skipped or missed that session/exercise
+- If the user does not mention an exercise at all, default its status to "as_planned".
 - Output ONLY a JSON object with EXACTLY these top-level keys — no other keys, no preamble, no markdown fences:
 
 {
@@ -53,7 +59,7 @@ OUTPUT RULES
       "day": "<string>",
       "label": "<string>",
       "exercises": [
-        {"name": "<string>", "sets": <int>, "reps": "<string>", "load_kg": <number|null>, "note": "<string>"}
+        {"name": "<string>", "sets": <int>, "reps": "<string>", "load_kg": <number|null>, "note": "<string>", "status": "<as_planned|too_easy|struggled|skipped>"}
       ]
     }
   ]
@@ -94,8 +100,12 @@ PLAN_JSON_SCHEMA = {
                                     "reps": {"type": "string"},
                                     "load_kg": {"type": ["number", "null"]},
                                     "note": {"type": "string"},
+                                    "status": {
+                                        "type": "string",
+                                        "enum": ["as_planned", "too_easy", "struggled", "skipped"],
+                                    },
                                 },
-                                "required": ["name", "sets", "reps", "load_kg", "note"],
+                                "required": ["name", "sets", "reps", "load_kg", "note", "status"],
                             },
                         },
                     },

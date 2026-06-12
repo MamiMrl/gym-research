@@ -36,9 +36,23 @@ def init_db() -> None:
                 transcript        TEXT
             )
         """)
-        # ALTER stays idempotent — safe to call on every cold boot.
+        # ALTERs stay idempotent — safe to call on every cold boot.
+        # `transcript` was added by commit b8c8a05 (voice-memo refactor) but
+        # only inside CREATE TABLE, which is a no-op against the pre-existing
+        # prod table — so it was silently missing until this ALTER was added.
+        conn.execute(
+            "ALTER TABLE checkin_history ADD COLUMN IF NOT EXISTS transcript TEXT"
+        )
         conn.execute(
             "ALTER TABLE checkin_history ADD COLUMN IF NOT EXISTS used_fact_id TEXT"
+        )
+        # Enables ON CONFLICT (week_number) DO UPDATE in end_checkin so a
+        # retried Confirm overwrites the prior row instead of duplicating it.
+        # If this raises on an old DB with duplicate week_numbers (from early
+        # testing), `DELETE FROM checkin_history WHERE ...` the dupes once.
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS checkin_history_week_number_uidx"
+            " ON checkin_history (week_number)"
         )
 
 
@@ -107,8 +121,14 @@ def end_checkin(
     now = datetime.now(timezone.utc).isoformat()
     with _conn() as conn:
         conn.execute(
-            "INSERT INTO checkin_history (week_number, completed_at, schedule_snapshot, transcript, used_fact_id)"
-            " VALUES (%s, %s, %s, %s, %s)",
+            "INSERT INTO checkin_history"
+            " (week_number, completed_at, schedule_snapshot, transcript, used_fact_id)"
+            " VALUES (%s, %s, %s, %s, %s)"
+            " ON CONFLICT (week_number) DO UPDATE SET"
+            "   completed_at = EXCLUDED.completed_at,"
+            "   schedule_snapshot = EXCLUDED.schedule_snapshot,"
+            "   transcript = EXCLUDED.transcript,"
+            "   used_fact_id = EXCLUDED.used_fact_id",
             (week_number, now, json.dumps(schedule), transcript, used_fact_id),
         )
         conn.execute("DELETE FROM checkin_state WHERE chat_id = %s", (chat_id,))

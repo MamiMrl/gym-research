@@ -29,7 +29,7 @@ _env = Environment(
 _tmpl = _env.get_template("newsletter.html")
 
 
-def send_newsletter(
+def prepare_newsletter(
     *,
     this_week: dict,
     next_week: dict,
@@ -37,10 +37,19 @@ def send_newsletter(
     week_number: int,
     used_fact_ids: list[str] | None = None,
     pdf_path: str,
-) -> str:
-    """Render and send the weekly newsletter. Returns the picked fact_id
-    so the caller can persist it in checkin_history (repeat-avoidance)."""
-    resend.api_key = os.environ["RESEND_API_KEY"]
+) -> tuple[str, dict]:
+    """Build the Resend payload for the weekly newsletter. No side effects.
+
+    Returns ``(picked_fact_id, resend_payload)``. The caller is expected to:
+      1. archive the row in ``checkin_history`` with the returned fact_id,
+      2. then call ``dispatch_newsletter(payload)``.
+
+    Splitting prepare/dispatch lets the caller persist durable state BEFORE
+    the irreversible email send. Otherwise a DB failure after a successful
+    send leaves a real email in the inbox pointing at a missing
+    ``checkin_history`` row — exactly the broken-CTA bug we hit on first
+    Sundays.
+    """
     to_addr = os.environ["YOUR_EMAIL"]
     from_addr = os.environ.get("RESEND_FROM", "workout@yourdomain.com")
     base_url = os.environ.get("APP_BASE_URL", "").rstrip("/")
@@ -78,11 +87,11 @@ def send_newsletter(
     pdf_name = f"light-weight-week-{week_number}.pdf"
 
     logger.info(
-        "Sending newsletter from=%s to=%s week=%s fact=%s hero=%s",
+        "Prepared newsletter from=%s to=%s week=%s fact=%s hero=%s",
         from_addr, to_addr, week_number, picked_fact["id"], hero_file,
     )
 
-    resp = resend.Emails.send({
+    payload = {
         "from":    from_addr,
         "to":      to_addr,
         "subject": ctx["subject"],
@@ -91,14 +100,25 @@ def send_newsletter(
         "attachments": [
             {"filename": pdf_name, "content": pdf_b64},
         ],
-    })
+    }
+    return picked_fact["id"], payload
 
+
+def dispatch_newsletter(payload: dict) -> str:
+    """Send the prepared payload via Resend. Returns the email id; raises
+    ``RuntimeError`` if Resend doesn't acknowledge with one.
+
+    Must be the LAST step in the Confirm flow — once this returns, the email
+    is in flight and any downstream failure produces an email-in-the-wild
+    with stale DB context.
+    """
+    resend.api_key = os.environ["RESEND_API_KEY"]
+    resp = resend.Emails.send(payload)
     email_id = resp.get("id") if isinstance(resp, dict) else getattr(resp, "id", None)
-    logger.info("Resend accepted email id=%s to=%s", email_id, to_addr)
+    logger.info("Resend accepted email id=%s to=%s", email_id, payload.get("to"))
     if not email_id:
         raise RuntimeError(f"Resend returned no email ID — possible delivery failure: {resp}")
-
-    return picked_fact["id"]
+    return email_id
 
 
 def _plain_text(ctx: dict) -> str:

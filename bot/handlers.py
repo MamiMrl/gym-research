@@ -6,7 +6,7 @@ from telegram.ext import ContextTypes
 from bot import state as st
 from bot.keyboards import CONFIRM_KEYBOARD
 from core import llm_client, pdf, transcribe
-from core.email import send_newsletter
+from core.email import dispatch_newsletter, prepare_newsletter
 from core.schedule import load_schedule, save_schedule
 
 logger = logging.getLogger(__name__)
@@ -205,8 +205,11 @@ async def _on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     week_number = st.latest_week_number() + 1
     used_ids = st.recent_fact_ids(limit=8)
 
+    # Prepare (pure) → archive (durable) → dispatch (irreversible). The email
+    # send is the LAST step on purpose: if the DB write fails after a successful
+    # send, the recipient is stuck with a CTA pointing at a missing row.
     try:
-        used_fact_id = send_newsletter(
+        used_fact_id, email_payload = prepare_newsletter(
             this_week=this_week,
             next_week=new_plan,
             transcript=transcript,
@@ -215,20 +218,39 @@ async def _on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             pdf_path=pdf_path,
         )
     except Exception as exc:
-        logger.exception("Newsletter send failed")
-        await update.effective_chat.send_message(f"Email failed: {exc}")
+        logger.exception("Newsletter prepare failed")
+        await update.effective_chat.send_message(f"Newsletter prepare failed: {exc}")
         return
 
-    # Persist: schedule_snapshot = the plan that's now active (= new_plan).
-    # That's what GET /plan/{week_number}.pdf will re-render.
+    # schedule_snapshot = the plan that's now active (= new_plan). That's what
+    # GET /plan/{week_number}.pdf re-renders. end_checkin UPSERTs on week_number
+    # so a retried Confirm at the same number is safe.
     save_schedule(new_plan)
-    st.end_checkin(
-        chat_id,
-        week_number=week_number,
-        schedule=new_plan,
-        transcript=transcript,
-        used_fact_id=used_fact_id,
-    )
+    try:
+        st.end_checkin(
+            chat_id,
+            week_number=week_number,
+            schedule=new_plan,
+            transcript=transcript,
+            used_fact_id=used_fact_id,
+        )
+    except Exception as exc:
+        logger.exception("Archive failed before send")
+        await update.effective_chat.send_message(
+            f"Archive failed, email NOT sent: {exc}"
+        )
+        return
+
+    try:
+        dispatch_newsletter(email_payload)
+    except Exception as exc:
+        logger.exception("Newsletter dispatch failed")
+        await update.effective_chat.send_message(
+            f"Week {week_number} archived, but email send failed: {exc}\n"
+            f"Re-run /checkin to retry — the next attempt will advance to "
+            f"week {week_number + 1}."
+        )
+        return
 
     await update.effective_chat.send_message(
         f"Done. Week {week_number} newsletter sent: *{new_plan['week_label']}*",

@@ -96,3 +96,21 @@ Replace per-exercise button taps with a single voice memo. Whisper → Llama →
 - **Best open-weight JSON model by benchmark** is Qwen 2.5 32B/72B (~94% structured-extraction accuracy vs Llama 3.3 ~87% per [Humai benchmark](https://www.humai.blog/qwen-2-5-vs-llama-3-3-best-open-source-llms-for-2026/)), but not hosted on Groq. Would require a provider switch. Not worth it for a 1-call-per-week job.
 
 - **Strava reconsidered** — original 2026-06-04 conclusion rejected Strava because it can't track sets/reps. User clarified: *not* a source of truth for strength work, but a passive ingestion layer for cardio + HR. Use cases: HR safety flagging; data accumulation for future visualizations.
+
+## 2026-06-11 — Newsletter CTA returned 500 ("transcript column does not exist")
+
+**Symptom:** Clicking the week-14 CTA in the email landed on a blank Vercel "Internal Server Error" page (HTTP 500, 21-byte `text/plain` body — the FUNCTION_INVOCATION_FAILED signature).
+
+**Root cause:** Two compounding bugs.
+
+1. The `transcript` column on `checkin_history` was added in commit `b8c8a05` (2026-06-04 voice-memo refactor) only inside `CREATE TABLE IF NOT EXISTS`. Against the pre-existing prod table, that statement is a no-op, so the column was never created in production.
+2. As a result, every `end_checkin` INSERT since 2026-06-04 silently failed — `checkin_history` was empty for every week. The user-visible Sunday flow (newsletter + PDF) had already succeeded by that point, so the failure was invisible until the new newsletter CTA endpoint queried the table.
+
+The CTA endpoint (`main.py:download_plan`) ran a SELECT listing the missing `transcript` column. Postgres raised `psycopg.errors.UndefinedColumn`, which escaped the handler's try/except (only the PDF-render path was wrapped) and surfaced as Vercel's generic 500.
+
+**Fix (2026-06-11):**
+- Manual one-liner in Neon SQL editor: `ALTER TABLE checkin_history ADD COLUMN IF NOT EXISTS transcript TEXT;`
+- Idempotent ALTER added to `bot/state.py:init_db` next to the existing `used_fact_id` ALTER, so fresh deploys self-heal.
+- Test rows from weeks 1–13 were deliberately not recovered (they were testing artifacts, not real history).
+
+**Lesson — codified in CLAUDE.md don'ts:** `CREATE TABLE IF NOT EXISTS` does not migrate columns. For every new column, also ship an idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in the same commit. The 2026-06-12 protective plan adds a boot-time schema-drift assertion (T4) to catch the next instance loudly instead of silently.

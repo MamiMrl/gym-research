@@ -49,7 +49,18 @@
       "Bash(vercel link *)",
       "Bash(open *)",
       "Bash(unzip -o DESIGN-Weekly-Science-Newsletter.zip -d DESIGN-Weekly-Science-Newsletter/)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(/usr/bin/python3 -c \"from PIL import Image; print\\('Pillow', Image.__version__\\)\")",
+      "Bash(awk *)",
+      "Bash(xargs cat)",
+      "Read(//private/tmp/grill-recon-1/.claude/**)",
+      "Read(//private/tmp/grill-recon-1/.claude/skills/**)",
+      "Bash(cp -r /tmp/grill-recon-1/.claude/skills/better-sqlite3-rebuild .claude/skills/)",
+      "Bash(cp -r /tmp/grill-recon-1/.claude/skills/improve-codebase-architecture .claude/skills/)",
+      "Bash(cp -r /tmp/grill-recon-1/.claude/skills/prd-to-issues .claude/skills/)",
+      "Bash(cp -r /tmp/grill-recon-1/.claude/skills/tdd .claude/skills/)",
+      "Bash(cp -r /tmp/grill-recon-1/.claude/skills/write-a-prd .claude/skills/)",
+      "Bash(git log *)"
     ]
   }
 }

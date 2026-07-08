@@ -46,6 +46,21 @@ def init_db() -> None:
         conn.execute(
             "ALTER TABLE checkin_history ADD COLUMN IF NOT EXISTS used_fact_id TEXT"
         )
+        # Legacy prod table has `results JSONB NOT NULL` from the pre-transcript
+        # schema; CREATE TABLE IF NOT EXISTS never touched it, so it kept
+        # rejecting inserts once end_checkin stopped populating `results`.
+        # Guarded because fresh DBs never had this column at all.
+        conn.execute("""
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'checkin_history' AND column_name = 'results'
+                ) THEN
+                    ALTER TABLE checkin_history ALTER COLUMN results DROP NOT NULL;
+                END IF;
+            END $$
+        """)
         # Enables ON CONFLICT (week_number) DO UPDATE in end_checkin so a
         # retried Confirm overwrites the prior row instead of duplicating it.
         # If this raises on an old DB with duplicate week_numbers (from early

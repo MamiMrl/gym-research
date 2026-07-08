@@ -15,7 +15,7 @@ Full architecture, env vars, deploy steps, troubleshooting: see `README.md`.
 ├── main.py, vercel.json, requirements.txt
 ├── bot/        Telegram handlers + Postgres state
 ├── core/       llm_client, transcribe, pdf, email, newsletter, facts, hero, signing, schedule, prompt
-├── config/     schedule.json — live source of truth, rewritten by the LLM each Submit
+├── config/     schedule.json — seed/template only; live plan lives in the Postgres `schedule` table
 ├── templates/  plan.html (PDF), newsletter.html (email)
 ├── data/       facts.json — curated science-fact pool
 ├── assets/     hero/*.jpg — rotated newsletter photos
@@ -35,7 +35,7 @@ Full architecture, env vars, deploy steps, troubleshooting: see `README.md`.
 - **`CREATE TABLE IF NOT EXISTS` is a no-op against pre-existing prod tables** — for every new column, also add an idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in `bot/state.py:init_db`. Skipping this silently breaks INSERTs (see `notes/system-b-history.md`, 2026-06-11 transcript-column incident).
 - **WeasyPrint is incompatible with Vercel.** PDF goes through PDFShift.
 - **SQLite is ephemeral on serverless.** All persistent state → Neon Postgres.
-- **`config/schedule.json` is the live source of truth**, rewritten by the LLM each Submit. `docs/personal-workout-plan.md` is historical reference only — don't sync from it.
+- **The live plan lives in the one-row Postgres `schedule` table** (ADR-002) — the LLM rewrites it each Submit via `save_schedule()`. `config/schedule.json` is a seed/template only; after editing it, push with `python3 scripts/push_schedule.py`. Never write runtime state to the bundle filesystem — Vercel reverts it on cold start. `docs/personal-workout-plan.md` is historical reference only — don't sync from it.
 - **System A is retired.** Don't resurrect `legacy_email/` code or routine `trig_01XUTpwZgjKkJw6VDq4HpZSh`.
 - **`llama-3.3-70b-versatile` does not support `json_schema` on Groq.** Use `json_object` + explicit JSON skeleton in the system prompt + Pydantic validation.
 - **PDFShift needs explicit `format` + `landscape` in the API payload.** CSS `@page` alone is unreliable — silently defaults to portrait and the grid spills to a 2nd page.

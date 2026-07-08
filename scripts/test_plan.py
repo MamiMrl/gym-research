@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from core.llm_client import generate_plan
-from core.schedule import load_schedule
+from core.schedule import SEED_PATH
 
 DEFAULT_TRANSCRIPT = (
     "Everything went as planned this week. Bench press felt solid at 70 kg. "
@@ -24,8 +24,12 @@ DEFAULT_TRANSCRIPT = (
 
 transcript = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_TRANSCRIPT
 
-print("Loading schedule…")
-schedule = load_schedule()
+# Seed file, not the live DB plan — this smoke-tests the LLM plumbing and
+# must stay runnable without DATABASE_URL (Neon vars are Sensitive in Vercel
+# and can't be pulled locally).
+print("Loading schedule (seed file)…")
+with open(SEED_PATH) as f:
+    schedule = json.load(f)
 
 print(f"Transcript: {transcript}\n")
 print("Calling LLM…")

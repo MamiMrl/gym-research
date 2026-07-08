@@ -54,6 +54,14 @@ def init_db() -> None:
             "CREATE UNIQUE INDEX IF NOT EXISTS checkin_history_week_number_uidx"
             " ON checkin_history (week_number)"
         )
+        # The live plan (ADR-002). One row only — the CHECK pins id to 1.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS schedule (
+                id         SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                plan       JSONB NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
 
 
 def start_checkin(chat_id: int) -> None:
@@ -132,6 +140,32 @@ def end_checkin(
             (week_number, now, json.dumps(schedule), transcript, used_fact_id),
         )
         conn.execute("DELETE FROM checkin_state WHERE chat_id = %s", (chat_id,))
+
+
+def get_schedule() -> dict | None:
+    with _conn() as conn:
+        row = conn.execute("SELECT plan FROM schedule WHERE id = 1").fetchone()
+    return row["plan"] if row else None
+
+
+def set_schedule(plan: dict) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    with _conn() as conn:
+        conn.execute(
+            "INSERT INTO schedule (id, plan, updated_at) VALUES (1, %s, %s)"
+            " ON CONFLICT (id) DO UPDATE SET"
+            "   plan = EXCLUDED.plan, updated_at = EXCLUDED.updated_at",
+            (json.dumps(plan), now),
+        )
+
+
+def latest_schedule_snapshot() -> dict | None:
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT schedule_snapshot FROM checkin_history"
+            " ORDER BY week_number DESC LIMIT 1"
+        ).fetchone()
+    return row["schedule_snapshot"] if row else None
 
 
 def latest_week_number() -> int:

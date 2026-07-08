@@ -129,7 +129,16 @@ RESULTING directive. They are related but not equivalent:
   - Not mentioned + no blanket-hold → status="as_planned", +1 increment.
   - Not mentioned + blanket-hold present → status="as_planned", HELD.
 
-─── 6) WORKED EXAMPLE ───
+─── 6) RETURNING AFTER A GAP ───
+
+If the transcript indicates a training layoff ("was away", "skipped the
+last two weeks", "didn't train", "holiday", "first week back"), do NOT
+apply progression: HOLD every load, sets, and reps identical to the
+input unless the user explicitly directs a change. A gap alone is NOT a
+deload trigger (no accumulated fatigue) — do not reduce sets or loads
+unless the user asks, and do not count the gap toward deload detection.
+
+─── 7) WORKED EXAMPLE ───
 
 Planned schedule contains (among others): Weighted Pull-up @ 5 kg,
 Explosive Pull-up @ 5 kg, Weighted Chin-up @ 5 kg, Barbell Squat @

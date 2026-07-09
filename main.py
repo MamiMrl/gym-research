@@ -26,6 +26,7 @@ logger = logging.getLogger("workout-tracker")
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = int(os.environ["TELEGRAM_CHAT_ID"])
 CRON_SECRET = os.environ["CRON_SECRET"]
+TELEGRAM_WEBHOOK_SECRET = os.environ["TELEGRAM_WEBHOOK_SECRET"]
 
 # Named ptb_app (not 'application') to avoid Vercel's ASGI entrypoint
 # auto-detection picking it up instead of the FastAPI `app` below.
@@ -91,10 +92,20 @@ async def download_plan(week_number: int, t: str = "") -> FileResponse:
 
 
 @app.post("/webhook")
-async def webhook(request: Request) -> dict:
+async def webhook(
+    request: Request,
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+) -> dict:
+    if x_telegram_bot_api_secret_token != TELEGRAM_WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     data = await request.json()
+    update = Update.de_json(data, ptb_app.bot)
+    if update.effective_chat is None or update.effective_chat.id != TELEGRAM_CHAT_ID:
+        # Silently drop — no reply, so strangers get no confirmation the bot is alive.
+        return {"ok": True}
+
     async with ptb_app:
-        update = Update.de_json(data, ptb_app.bot)
         await ptb_app.process_update(update)
     return {"ok": True}
 

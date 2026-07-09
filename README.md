@@ -144,6 +144,7 @@ Expose port 8000 to Telegram via ngrok for full bot testing:
 ```bash
 ngrok http 8000
 curl -F "url=https://<ngrok-id>.ngrok.app/webhook" \
+     -F "secret_token=${TELEGRAM_WEBHOOK_SECRET}" \
      "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook"
 ```
 
@@ -160,12 +161,15 @@ vercel link          # connect local repo to the Vercel project
 vercel deploy --prod
 ```
 
-Secrets are managed in the Vercel dashboard (Settings → Environment Variables). Required keys: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GROQ_API_KEY`, `GROQ_MODEL`, `CRON_SECRET`, `RESEND_API_KEY`, `RESEND_FROM`, `YOUR_EMAIL`, `PDFSHIFT_API_KEY`. `DATABASE_URL` is injected automatically by the Neon Postgres integration.
+Secrets are managed in the Vercel dashboard (Settings → Environment Variables). Required keys: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`, `GROQ_API_KEY`, `GROQ_MODEL`, `CRON_SECRET`, `RESEND_API_KEY`, `RESEND_FROM`, `YOUR_EMAIL`, `PDFSHIFT_API_KEY`. `DATABASE_URL` is injected automatically by the Neon Postgres integration.
 
-After a fresh deploy, register the Telegram webhook:
+### Register the Telegram webhook
+
+After a fresh deploy (or whenever `TELEGRAM_WEBHOOK_SECRET` is rotated), register the webhook with the matching secret so Telegram starts sending it on every update:
 
 ```bash
 curl -F "url=https://<your-app>.vercel.app/webhook" \
+     -F "secret_token=${TELEGRAM_WEBHOOK_SECRET}" \
      "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook"
 ```
 

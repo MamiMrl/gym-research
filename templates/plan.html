@@ -2,52 +2,48 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     @page { size: A4 landscape; margin: {{ page_margin_mm }}mm; }
 
     body {
       font-family: 'Inter', -apple-system, Helvetica, Arial, sans-serif;
       font-size: 10pt;
-      color: #f0f0f0;
-      background: #1a1a1a;
+      color: #000;
+      background: #fff;
     }
 
     .page-break { page-break-before: always; }
 
-    /* ── Page header (slim — keeps room for cards) ── */
+    /* ── Page header ── */
     .page-header {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      border-bottom: 1.5px solid #FDE100;
+      border-bottom: 1.5px solid #000;
       padding-bottom: 2mm;
       margin-bottom: 3mm;
     }
     .week-title {
-      font-family: 'Bebas Neue', Impact, sans-serif;
       font-size: 16pt;
-      color: #FDE100;
-      letter-spacing: 0.05em;
+      font-weight: 700;
+      letter-spacing: 0.03em;
       line-height: 1;
     }
     .generated-date {
       font-family: 'JetBrains Mono', 'Courier New', monospace;
       font-size: 8pt;
-      color: #888;
+      color: #444;
     }
 
     /* ── Deload banner ── */
     .deload-banner {
-      background: #FDE100;
-      color: #1a1a1a;
-      font-family: 'Bebas Neue', Impact, sans-serif;
+      border: 1.5px solid #000;
+      font-weight: 700;
       font-size: 10pt;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.05em;
       padding: 2mm 3mm;
       margin-bottom: 3mm;
     }
@@ -74,63 +70,61 @@
       height: 100%;
       border-collapse: collapse;
       table-layout: fixed;
-      background: #1a1a1a;
+      border: 1px solid #000;
     }
 
-    /* Day-name row — first row of each session table; cuts cleanly with the rest */
+    /* Day-name row — first row of each session table */
     th.day-row {
-      font-family: 'Bebas Neue', Impact, sans-serif;
-      font-size: 14pt;
-      letter-spacing: 0.07em;
-      color: #1a1a1a;
-      background: #FDE100;
+      font-size: 10pt;
+      font-weight: 700;
+      letter-spacing: 0.02em;
       text-align: left;
       text-transform: none;
-      padding: 2mm 3mm;
-      border-bottom: none;
+      padding: 1.5mm 2mm;
+      border-bottom: 1px solid #000;
     }
 
     th {
       text-align: left;
-      font-size: 7.5pt;
+      font-size: 6.5pt;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: .07em;
-      color: #FDE100;
-      border-bottom: 1px solid rgba(253,225,0,0.25);
-      padding: 1.5mm 2mm;
+      letter-spacing: .05em;
+      border: 1px solid #000;
+      padding: 1mm 1.5mm;
     }
     td {
-      padding: 1.5mm 2mm;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      font-size: 9.5pt;
+      padding: 1mm 1.5mm;
+      border: 1px solid #000;
+      font-size: 7.5pt;
       vertical-align: middle;
       overflow: hidden;
     }
     td.num {
       font-family: 'JetBrains Mono', 'Courier New', monospace;
-      font-size: 9pt;
-      color: #e0e0e0;
+      font-size: 7pt;
     }
-    td.note-cell { font-size: 8pt; color: #999; }
+    td.note-cell { font-size: 6.5pt; color: #444; }
 
-    .col-exercise { width: 36%; }
-    .col-sets     { width: 9%;  text-align: center; }
-    .col-reps     { width: 12%; text-align: center; }
-    .col-load     { width: 13%; text-align: center; }
-    .col-actual   { width: 15%; }
-    .col-note     { width: 15%; }
+    /* Exercise + note carry the longest text, so they get most of the width;
+       sets/reps/load are 1-4 characters and don't need much room. */
+    .col-exercise { width: 38%; }
+    .col-sets     { width: 7%;  text-align: center; }
+    .col-reps     { width: 9%;  text-align: center; }
+    .col-load     { width: 9%;  text-align: center; }
+    .col-actual   { width: 12%; }
+    .col-note     { width: 25%; }
 
     .actual-box {
-      border-bottom: 1px solid rgba(253,225,0,0.45);
-      min-width: 14mm;
+      border-bottom: 1px solid #000;
+      min-width: 9mm;
       display: inline-block;
     }
 
     /* ── Crop marks at grid gaps (cut paths) ── */
     .crop-mark {
       position: absolute;
-      color: #FDE100;
+      color: #000;
       font-family: 'JetBrains Mono', 'Courier New', monospace;
       font-size: 9pt;
       line-height: 1;
@@ -138,11 +132,10 @@
 
     /* ── Run sticker page ── */
     .sticker-page-header {
-      font-family: 'Bebas Neue', Impact, sans-serif;
       font-size: 16pt;
-      color: #FDE100;
-      letter-spacing: 0.07em;
-      border-bottom: 1.5px solid rgba(253,225,0,0.4);
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      border-bottom: 1.5px solid #000;
       padding-bottom: 2mm;
       margin-bottom: 4mm;
     }
@@ -154,20 +147,18 @@
     }
 
     .sticker {
-      border: 1.5px dashed rgba(253,225,0,0.55);
+      border: 1.5px dashed #000;
       padding: 3mm 4mm;
       height: 78mm;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      background: #111;
     }
 
     .sticker-run-label {
-      font-family: 'Bebas Neue', Impact, sans-serif;
-      font-size: 22pt;
-      color: #FDE100;
-      letter-spacing: 0.12em;
+      font-size: 20pt;
+      font-weight: 700;
+      letter-spacing: 0.08em;
       line-height: 1;
     }
 
@@ -176,13 +167,13 @@
       align-items: flex-end;
       gap: 3px;
       font-size: 9pt;
-      color: #888;
+      color: #444;
       font-family: 'JetBrains Mono', 'Courier New', monospace;
     }
 
     .sticker-line {
       flex: 1;
-      border-bottom: 1px solid rgba(253,225,0,0.35);
+      border-bottom: 1px solid #000;
       margin-left: 2px;
     }
 
@@ -229,9 +220,9 @@
           <td class="col-exercise">{{ ex.name }}</td>
           <td class="col-sets num">{{ ex.sets }}</td>
           <td class="col-reps num">{{ ex.reps }}</td>
-          <td class="col-load num">{{ ex.load_kg if ex.load_kg else '—' }}</td>
+          <td class="col-load num">{{ ex.load_kg if ex.load_kg is not none else 'BW' }}</td>
           <td class="col-actual"><span class="actual-box">&nbsp;</span></td>
-          <td class="col-note note-cell">{{ ex.note }}</td>
+          <td class="col-note note-cell">&nbsp;</td>
         </tr>
         {% endfor %}
       </tbody>

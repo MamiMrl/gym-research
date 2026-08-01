@@ -20,8 +20,8 @@ PAGE_WIDTH_MM = 297     # A4 long edge (landscape)
 PAGE_HEIGHT_MM = 210    # A4 short edge (landscape)
 PAGE_MARGIN_MM = 10     # outer page margin (all sides)
 GRID_GAP_MM = 6         # gap between cards — also the cut path
-TABLE_WIDTH_MM = 134    # workout-card width;  (297 - 2·10 - 6) / 2 = 135, leave 1mm slack
-TABLE_HEIGHT_MM = 85    # workout-card height; (210 - 2·10 - 6 - 10 header) / 2 = 87, leave 2mm slack
+TABLE_WIDTH_MM = 108    # workout-card width — sized to sit inside an A5 notebook page with margin
+TABLE_HEIGHT_MM = 70    # workout-card height — sized to sit inside an A5 notebook page with margin
 # ───────────────────────────────────────────────────────────────────────────
 
 _env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))

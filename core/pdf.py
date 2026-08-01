@@ -27,10 +27,10 @@ TABLE_HEIGHT_MM = 70    # workout-card height — sized to sit inside an A5 note
 _env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
 
 
-def render_pdf(plan: dict, output_path: str = "/tmp/plan.pdf") -> str:
+def render_pdf(plan: dict, week_number: int, output_path: str = "/tmp/plan.pdf") -> str:
     template = _env.get_template("plan.html")
     html_str = template.render(
-        week_label=plan["week_label"],
+        week_number=week_number,
         sessions=plan["sessions"],
         generated_date=date.today().strftime("%d %B %Y"),
         deload=plan.get("deload", False),
@@ -74,5 +74,6 @@ if __name__ == "__main__":
         plan = json.load(f)
 
     out = sys.argv[1] if len(sys.argv) > 1 else "/tmp/plan.pdf"
-    path = render_pdf(plan, out)
+    preview_week_number = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+    path = render_pdf(plan, preview_week_number, out)
     print(f"Wrote PDF to {path}")

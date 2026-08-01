@@ -79,7 +79,7 @@ async def download_plan(week_number: int, t: str = "") -> FileResponse:
     snapshot = row["schedule_snapshot"]
     out_path = f"/tmp/plan-week-{week_number}.pdf"
     try:
-        pdf.render_pdf(snapshot, output_path=out_path)
+        pdf.render_pdf(snapshot, week_number, output_path=out_path)
     except Exception as exc:
         logger.exception("PDF re-render failed for week %s", week_number)
         raise HTTPException(status_code=502, detail=f"PDF render failed: {exc}") from exc

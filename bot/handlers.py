@@ -192,8 +192,10 @@ async def _on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     transcript = s.get("transcript") or ""
     await update.effective_chat.send_message("Generating PDF and sending newsletter…")
 
+    week_number = st.latest_week_number() + 1
+
     try:
-        pdf_path = pdf.render_pdf(new_plan, output_path="/tmp/plan.pdf")
+        pdf_path = pdf.render_pdf(new_plan, week_number, output_path="/tmp/plan.pdf")
     except Exception as exc:
         logger.exception("PDF render failed")
         await update.effective_chat.send_message(f"PDF render failed: {exc}")
@@ -202,7 +204,6 @@ async def _on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # Load this-week BEFORE save_schedule overwrites it — the newsletter recap
     # diffs (this_week → next_week) to compute +kg added, biggest jump, etc.
     this_week = load_schedule()
-    week_number = st.latest_week_number() + 1
     used_ids = st.recent_fact_ids(limit=8)
 
     # Prepare (pure) → archive (durable) → dispatch (irreversible). The email

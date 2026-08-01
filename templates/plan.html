@@ -191,7 +191,7 @@
 
 <!-- ════ PAGE 1 — All 4 workout stickers ════ -->
 <div class="page-header">
-  <div class="week-title">Week {{ week_label }}</div>
+  <div class="week-title">Week {{ week_number }}</div>
   <div class="generated-date">{{ generated_date }}</div>
 </div>
 
@@ -204,7 +204,7 @@
   <div class="session">
     <table>
       <thead>
-        <tr><th colspan="6" class="day-row">{{ session.day }} — {{ session.label }}</th></tr>
+        <tr><th colspan="6" class="day-row">W{{ week_number }} · {{ session.day }} — {{ session.label }}</th></tr>
         <tr>
           <th class="col-exercise">Exercise</th>
           <th class="col-sets">Sets</th>

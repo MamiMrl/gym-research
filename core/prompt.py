@@ -1,7 +1,7 @@
 SYSTEM_PROMPT = """You are a strength-training progression engine.
 
 You receive TWO inputs:
-1. PLANNED SCHEDULE — this week's prescribed sessions (day, exercises, sets, reps, load_kg, note).
+1. PLANNED SCHEDULE — this week's prescribed sessions (day, exercises, sets, reps, rest, load_kg, note).
 2. VOICE-MEMO TRANSCRIPT — the user's free-form spoken summary of how the week went.
 
 Your job is to produce next week's schedule by applying the rules below to the planned schedule based on what the user reported in the transcript.
@@ -103,13 +103,14 @@ jumps unless the user explicitly says it was too easy.
   - "db bicep curl will increase"     → +1.0 kg (dumbbell standard)
   - "leg press will reduce"           → −2.5 kg (machine standard)
 
-─── 4) SETS AND REPS ARE STICKY ───
+─── 4) SETS, REPS, AND REST ARE STICKY ───
 
-Do NOT change sets, reps, or work-rest structure UNLESS the user
-explicitly says so. A directive about LOAD ("reduce squat", "bench up
-2.5") does NOT authorise a sets change ("3 → 4"). Keep sets and reps
+Do NOT change sets, reps, or rest UNLESS the user explicitly says so.
+A directive about LOAD ("reduce squat", "bench up 2.5") does NOT
+authorise a sets, reps, or rest change. Keep sets, reps, and rest
 identical to the input unless the transcript names them directly
-("add a set", "drop to 8 reps", "make it 5 sets", etc.).
+("add a set", "drop to 8 reps", "make it 5 sets", "rest longer on
+squats", etc.).
 
 ─── 5) STATUS FIELD vs LOAD CHANGE ───
 
@@ -194,7 +195,7 @@ OUTPUT RULES
       "day": "<string>",
       "label": "<string>",
       "exercises": [
-        {"name": "<string>", "sets": <int>, "reps": "<string>", "load_kg": <number|null>, "note": "<string>", "status": "<as_planned|too_easy|struggled|skipped>"}
+        {"name": "<string>", "sets": <int>, "reps": "<string>", "rest": "<string>", "load_kg": <number|null>, "note": "<string>", "status": "<as_planned|too_easy|struggled|skipped>"}
       ]
     }
   ]
@@ -202,6 +203,7 @@ OUTPUT RULES
 
 - Every load_kg that is null in the input MUST stay null in the output.
 - Round all load_kg values to the nearest 0.25 kg.
+- Every "rest" value MUST be carried over unchanged from the input UNLESS the user explicitly asks to change rest periods for that exercise.
 """
 
 
@@ -233,6 +235,7 @@ PLAN_JSON_SCHEMA = {
                                     "name": {"type": "string"},
                                     "sets": {"type": "integer"},
                                     "reps": {"type": "string"},
+                                    "rest": {"type": "string"},
                                     "load_kg": {"type": ["number", "null"]},
                                     "note": {"type": "string"},
                                     "status": {
@@ -240,7 +243,7 @@ PLAN_JSON_SCHEMA = {
                                         "enum": ["as_planned", "too_easy", "struggled", "skipped"],
                                     },
                                 },
-                                "required": ["name", "sets", "reps", "load_kg", "note", "status"],
+                                "required": ["name", "sets", "reps", "rest", "load_kg", "note", "status"],
                             },
                         },
                     },
@@ -259,8 +262,9 @@ def build_prompt(schedule: dict, transcript: str) -> str:
         lines.append(f"\n{session['day']} — {session['label']}")
         for ex in session["exercises"]:
             load = f"@ {ex['load_kg']} kg" if ex.get("load_kg") is not None else "BW"
+            rest = f", rest {ex['rest']}" if ex.get("rest") else ""
             note = f"  ({ex['note']})" if ex.get("note") else ""
-            lines.append(f"  - {ex['name']}: {ex['sets']}x{ex['reps']} {load}{note}")
+            lines.append(f"  - {ex['name']}: {ex['sets']}x{ex['reps']} {load}{rest}{note}")
 
     lines.append("\n\nVOICE-MEMO TRANSCRIPT:")
     lines.append(transcript.strip() or "(empty)")

@@ -94,9 +94,10 @@
       padding: 1mm 1.5mm;
     }
     td {
-      padding: 1mm 1.5mm;
+      padding: 0.8mm 1.5mm;
       border: 1px solid #000;
       font-size: 7.5pt;
+      line-height: 1.05;
       vertical-align: middle;
       overflow: hidden;
     }
@@ -109,11 +110,12 @@
     /* Exercise + note carry the longest text, so they get most of the width;
        sets/reps/load are 1-4 characters and don't need much room. */
     .col-exercise { width: 46%; }
-    .col-sets     { width: 7%;  text-align: center; }
-    .col-reps     { width: 9%;  text-align: center; }
-    .col-load     { width: 9%;  text-align: center; }
-    .col-actual   { width: 10%; }
-    .col-note     { width: 19%; }
+    .col-sets     { width: 6%;  text-align: center; }
+    .col-reps     { width: 8%;  text-align: center; }
+    .col-rest     { width: 8%;  text-align: center; }
+    .col-load     { width: 8%;  text-align: center; }
+    .col-actual   { width: 9%; }
+    .col-note     { width: 15%; }
 
     .actual-box {
       border-bottom: 1px solid #000;
@@ -204,11 +206,12 @@
   <div class="session">
     <table>
       <thead>
-        <tr><th colspan="6" class="day-row">W{{ week_number }} · {{ session.day }} — {{ session.label }}</th></tr>
+        <tr><th colspan="7" class="day-row">W{{ week_number }} · {{ session.day }} — {{ session.label }}</th></tr>
         <tr>
           <th class="col-exercise">Exercise</th>
           <th class="col-sets">Sets</th>
           <th class="col-reps">Reps</th>
+          <th class="col-rest">Rest</th>
           <th class="col-load">kg</th>
           <th class="col-actual">Actual</th>
           <th class="col-note">Note</th>
@@ -220,6 +223,7 @@
           <td class="col-exercise">{{ ex.name }}</td>
           <td class="col-sets num">{{ ex.sets }}</td>
           <td class="col-reps num">{{ ex.reps }}</td>
+          <td class="col-rest num">{{ ex.rest }}</td>
           <td class="col-load num">{{ ex.load_kg if ex.load_kg is not none else 'BW' }}</td>
           <td class="col-actual"><span class="actual-box">&nbsp;</span></td>
           <td class="col-note note-cell">&nbsp;</td>

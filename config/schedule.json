@@ -1,48 +1,55 @@
 {
-  "week_label": "Current block",
+  "week_label": "Week 2",
+  "deload": false,
+  "deload_reason": null,
   "sessions": [
     {
       "day": "Monday",
       "label": "Upper — Push + Pull",
       "exercises": [
-        { "name": "Wall Handstand",          "sets": 3, "reps": "30 s",  "load_kg": null, "note": "" },
-        { "name": "Weighted Push-up",        "sets": 3, "reps": "8–10",  "load_kg": 13.75,"note": "" },
-        { "name": "Weighted Incline Push-up","sets": 3, "reps": 10,      "load_kg": 12.5, "note": "feet elevated" },
-        { "name": "Weighted Pull-up",        "sets": 4, "reps": 6,       "load_kg": 8,    "note": "kettlebell" },
-        { "name": "Weighted Pike Push-up",   "sets": 3, "reps": "5–8",   "load_kg": null, "note": "" }
+        { "name": "Wall Handstand",           "sets": 3, "reps": "30 s",  "rest": "60 s",  "load_kg": null, "note": "BW" },
+        { "name": "Weighted Push-up",         "sets": 3, "reps": "10",    "rest": "90 s",  "load_kg": 15.0, "note": "" },
+        { "name": "Weighted Incline Push-up", "sets": 3, "reps": "7",     "rest": "90 s",  "load_kg": 15.0, "note": "feet elevated" },
+        { "name": "Weighted Pull-up",         "sets": 4, "reps": "4",     "rest": "150 s", "load_kg": 8.0,  "note": "kettlebell" },
+        { "name": "Weighted Pike Push-up",    "sets": 3, "reps": "6",     "rest": "90 s",  "load_kg": null, "note": "BW" },
+        { "name": "Weighted Dip",             "sets": 3, "reps": "8–10",  "rest": "120 s", "load_kg": null, "note": "chest/triceps; bodyweight to start, add plate once 3×10 clean" }
       ]
     },
     {
       "day": "Wednesday",
       "label": "Legs (fundamentals) + Abs/Lower-back",
       "exercises": [
-        { "name": "Barbell Squat",          "sets": 4, "reps": "5–6",   "load_kg": 82.5, "note": "" },
-        { "name": "Romanian DL",            "sets": 3, "reps": 10,      "load_kg": 75,   "note": "" },
-        { "name": "Weighted Back Extension","sets": 3, "reps": "10–12", "load_kg": 20,   "note": "" },
-        { "name": "Hanging Leg Raise",      "sets": 3, "reps": 10,      "load_kg": null, "note": "" },
-        { "name": "Cable Crunch",           "sets": 3, "reps": "10–12", "load_kg": 27,   "note": "kneeling, rope attachment" }
+        { "name": "Barbell Squat",           "sets": 4, "reps": "5",      "rest": "180 s", "load_kg": 82.5, "note": "" },
+        { "name": "Romanian DL",             "sets": 3, "reps": "10",     "rest": "120 s", "load_kg": 75.0, "note": "" },
+        { "name": "Weighted Back Extension", "sets": 3, "reps": "10–12",  "rest": "90 s",  "load_kg": 20.0, "note": "" },
+        { "name": "Hanging Leg Raise",       "sets": 3, "reps": "10",     "rest": "60 s",  "load_kg": null, "note": "BW" },
+        { "name": "Cable Crunch",            "sets": 3, "reps": "10–12",  "rest": "60 s",  "load_kg": 27.0, "note": "kneeling, rope attachment" }
       ]
     },
     {
       "day": "Friday",
       "label": "Triceps/Biceps/Forearm + Back",
       "exercises": [
-        { "name": "Explosive Pull-up",       "sets": 3, "reps": "4–5",  "load_kg": null, "note": "" },
-        { "name": "Weighted Diamond Push-up","sets": 3, "reps": "8–10", "load_kg": 12.5, "note": "" },
-        { "name": "Single-Arm DB Row",       "sets": 3, "reps": "8–10", "load_kg": 20,   "note": "per arm" },
-        { "name": "OH Military Press",       "sets": 3, "reps": 8,      "load_kg": 5,    "note": "per side, 20kg bar → 30kg total" },
-        { "name": "DB Bicep Curl",           "sets": 3, "reps": 10,     "load_kg": 12.5, "note": "per DB" }
+        { "name": "Explosive Pull-up",        "sets": 3, "reps": "4–5",   "rest": "150 s", "load_kg": 4.0,  "note": "" },
+        { "name": "Weighted Diamond Push-up", "sets": 3, "reps": "8–10",  "rest": "90 s",  "load_kg": 15.0, "note": "" },
+        { "name": "Single-Arm DB Row",        "sets": 3, "reps": "8–10",  "rest": "90 s",  "load_kg": 22.5, "note": "per arm" },
+        { "name": "OH Military Press",        "sets": 3, "reps": "8",     "rest": "120 s", "load_kg": 5.0,  "note": "per side, 20kg bar → 30kg total" },
+        { "name": "DB Bicep Curl",            "sets": 3, "reps": "10",    "rest": "60 s",  "load_kg": 15.0, "note": "per DB" },
+        { "name": "Weighted Bench Dip",       "sets": 3, "reps": "10–12", "rest": "75 s",  "load_kg": null, "note": "feet elevated; triceps medial head; bodyweight to start" },
+        { "name": "DB Lateral Raise",         "sets": 3, "reps": "12–15", "rest": "60 s",  "load_kg": 6.0,  "note": "per DB; side/medial delt, form over load" }
       ]
     },
     {
       "day": "Saturday",
       "label": "Deadlift + Back",
       "exercises": [
-        { "name": "Deadlift",         "sets": 3, "reps": "4–5",  "load_kg": 100,  "note": "" },
-        { "name": "Cable Woodchop",   "sets": 3, "reps": 12,     "load_kg": 15,   "note": "high-to-low, per side" },
-        { "name": "Weighted Chin-up", "sets": 4, "reps": 6,      "load_kg": 8,    "note": "kettlebell" },
-        { "name": "DB Bicep Curl",    "sets": 3, "reps": 10,     "load_kg": 12.5, "note": "per DB" },
-        { "name": "Weighted Plank",   "sets": 3, "reps": "60 s", "load_kg": 20,   "note": "" }
+        { "name": "Deadlift",             "sets": 3, "reps": "4",     "rest": "180 s", "load_kg": 102.5, "note": "" },
+        { "name": "Cable Woodchop",       "sets": 3, "reps": "12",    "rest": "75 s",  "load_kg": 12.0,  "note": "high-to-low, per side" },
+        { "name": "Weighted Chin-up",     "sets": 4, "reps": "4",     "rest": "150 s", "load_kg": 10.0,  "note": "kettlebell" },
+        { "name": "Seated Cable Row",     "sets": 3, "reps": "10–12", "rest": "90 s",  "load_kg": null,  "note": "new exercise — start light, self-select working weight this session" },
+        { "name": "DB Bicep Curl",        "sets": 3, "reps": "10",    "rest": "60 s",  "load_kg": 15.0,  "note": "per DB" },
+        { "name": "Reverse Pec-Dec Fly",  "sets": 3, "reps": "12",    "rest": "60 s",  "load_kg": null,  "note": "rear delt; new exercise — start light, self-select working weight this session" },
+        { "name": "Weighted Plank",       "sets": 3, "reps": "60 s",  "rest": "60 s",  "load_kg": 20.0,  "note": "" }
       ]
     }
   ]

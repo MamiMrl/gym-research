@@ -30,6 +30,7 @@ class _Exercise(BaseModel):
     name: str
     sets: int
     reps: str
+    rest: str = ""
     load_kg: float | None
     note: str = ""
     # Default keeps legacy plans (pre-status) and quiet exercises (not mentioned

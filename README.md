@@ -4,7 +4,7 @@ Send a voice memo after your Sunday workout. Get next week's plan as a PDF in yo
 
 **gym-progression-bot** is a self-hosted Telegram bot that replaces manual spreadsheet tracking. Record a 30-second voice note describing how each session went — too easy, struggled, skipped a set — and the bot transcribes it, applies progressive overload rules, and emails you a ready-to-print PDF plan for the week ahead.
 
-Built on: [Groq](https://groq.com) (Llama 3.3 70B + Whisper), Neon Postgres, PDFShift, Resend, Vercel.
+Built on: [Groq](https://groq.com) (GPT-OSS 120B + Whisper), Neon Postgres, PDFShift, Resend, Vercel.
 
 The active system is **System B** (Telegram voice-memo bot). System A — an older email-based rule engine — was retired 2026-06-03 and lives in `legacy_email/` for reference.
 
@@ -13,7 +13,7 @@ The active system is **System B** (Telegram voice-memo bot). System A — an old
 | | System A (retired) | System B (current) |
 |---|---|---|
 | **Channel** | Email reply | Telegram voice memo |
-| **LLM** | None (rule-based) | `llama-3.3-70b-versatile` (planner) + `whisper-large-v3-turbo` (transcription) on Groq |
+| **LLM** | None (rule-based) | `openai/gpt-oss-120b` (planner) + `whisper-large-v3-turbo` (transcription) on Groq |
 | **Output** | HTML email + printable plan | PDF attached to email (via Resend) |
 | **Trigger** | Cloud routine `trig_01XUTpwZgjKkJw6VDq4HpZSh`, Sundays 08:00 Berlin | Vercel cron (via `vercel.json`), Sundays 08:00 UTC → GET `/trigger` |
 | **Code** | `legacy_email/` | `main.py`, `bot/`, `core/`, `config/`, `templates/`, `vercel.json` |
@@ -45,7 +45,7 @@ The active system is **System B** (Telegram voice-memo bot). System A — an old
 ├── core/
 │   ├── schedule.py            Load/save config/schedule.json
 │   ├── prompt.py              System prompt + per-week prompt builder
-│   ├── llm_client.py          Groq llama-3.3-70b-versatile (json_object + Pydantic validation)
+│   ├── llm_client.py          Groq openai/gpt-oss-120b (json_object + reasoning_format="hidden" + Pydantic validation)
 │   ├── transcribe.py          Groq whisper-large-v3-turbo (voice memo → text)
 │   ├── pdf.py                 Jinja2 render → PDFShift API → PDF bytes
 │   └── email.py               Resend send w/ base64 PDF attachment
@@ -86,9 +86,9 @@ TELEGRAM_BOT_TOKEN=...
 TELEGRAM_CHAT_ID=...
 
 # LLM + ASR — Groq is the sole provider.
-# Llama 3.3 70B for planning (json_object mode), Whisper turbo for voice transcription.
+# GPT-OSS 120B for planning (json_object mode), Whisper turbo for voice transcription.
 GROQ_API_KEY=gsk_...
-GROQ_MODEL=llama-3.3-70b-versatile           # does NOT support json_schema on Groq; json_object used instead
+GROQ_MODEL=openai/gpt-oss-120b               # reasoning model — reasoning_format="hidden" set in core/llm_client.py
 GROQ_WHISPER_MODEL=whisper-large-v3-turbo    # transcription — ~250× real-time
 
 # PDF generation — PDFShift managed API (50 free conversions/month, no system libs needed)
@@ -254,7 +254,11 @@ psycopg v3's `execute()` runs **one SQL statement per call**. Passing a string w
 
 ### `Plan generation failed: Expecting value: line 1 column 1 (char 0)` (historical)
 
-This was `json.loads("")` from `gpt-oss-20b` — a reasoning model that consumed the entire `max_tokens` budget on internal reasoning before producing visible `content`. Resolved 2026-06-04 evening by swapping to `llama-3.3-70b-versatile` with strict `json_schema` response_format + Pydantic validation in `core/llm_client.py`. If you see this on a fresh deploy, double-check that `GROQ_MODEL` is set to `llama-3.3-70b-versatile` in Vercel — not `openai/gpt-oss-20b`.
+This was `json.loads("")` from `gpt-oss-20b` — a reasoning model that consumed the entire `max_tokens` budget on internal reasoning before producing visible `content`. Resolved 2026-06-04 evening by swapping to `llama-3.3-70b-versatile` with `json_object` response_format + Pydantic validation in `core/llm_client.py`.
+
+### `Plan generation failed: Error code: 404 - model_not_found` (historical)
+
+Groq deprecated `llama-3.3-70b-versatile` for free/dev-tier accounts on 2026-06-17; the 404 landed once the grace period ended (hit 2026-08-16). Fixed by swapping to `openai/gpt-oss-120b` — but that's a reasoning model too, so `reasoning_format="hidden"` is now set explicitly and `max_tokens` bumped to 8192, to avoid reproducing the `gpt-oss-20b` empty-content bug above. If you see this again, check `console.groq.com/docs/deprecations` before picking a replacement model — the docs pages for deprecated models often stay live and can mislead you into thinking a decommissioned model is still active.
 
 ### `INSERT or UPDATE on checkin_state ... null value in column "..." violates not-null constraint`
 
@@ -272,7 +276,7 @@ Vercel's Logs tab shows entries from all deployments, not just the latest. A `li
 
 ## LLM + ASR design (System B)
 
-**Planner — `core/llm_client.py`** calls **`llama-3.3-70b-versatile`** on Groq with `response_format={"type":"json_schema","json_schema":PLAN_JSON_SCHEMA}` (strict mode). The response is parsed and validated against a Pydantic `WeeklyPlan` model before being returned. Strict mode guarantees the response either matches the schema or the API errors — eliminates the `json.loads("")` class of failures that bit `gpt-oss-20b` (see Troubleshooting).
+**Planner — `core/llm_client.py`** calls **`openai/gpt-oss-120b`** on Groq with `response_format={"type":"json_object"}` (`json_schema` is not used — the explicit JSON skeleton in `SYSTEM_PROMPT` plus Pydantic validation carries that weight instead) and `reasoning_format="hidden"` (this is a reasoning model — without it, hidden reasoning tokens can consume the whole `max_tokens` budget and leave nothing for the actual JSON output, the failure mode that bit `gpt-oss-20b`, see Troubleshooting). The response is parsed and validated against a Pydantic `WeeklyPlan` model before being returned.
 
 **System prompt** (`core/prompt.py`) carries the entire progression rule set: status inference, per-exercise-type load increments, deload triggers (6-week progression cap, fatigue keywords, Strava CNS-load signal). The LLM is both parser *and* executor — user voice-memo notes can naturally override the defaults ("shoulder felt off, going down 2.5" beats `as_planned` → `+2.5 kg`).
 

@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 GROQ_BASE_URL = os.environ.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 
 _client: Optional[OpenAI] = None
 
@@ -58,9 +58,15 @@ def generate_plan(schedule: dict, transcript: str) -> dict:
 
     resp = client.chat.completions.create(
         model=GROQ_MODEL,
-        max_tokens=4096,
+        max_tokens=8192,
         temperature=0.2,
         response_format={"type": "json_object"},
+        # openai/gpt-oss-120b is a reasoning model — hidden reasoning tokens
+        # count against max_tokens too. Without reasoning_format="hidden" a
+        # long reasoning pass can consume the whole budget and leave nothing
+        # for the actual JSON output (this already happened once with
+        # gpt-oss-20b, see README.md troubleshooting).
+        reasoning_format="hidden",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_message},

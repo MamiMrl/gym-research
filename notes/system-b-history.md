@@ -114,3 +114,18 @@ The CTA endpoint (`main.py:download_plan`) ran a SELECT listing the missing `tra
 - Test rows from weeks 1–13 were deliberately not recovered (they were testing artifacts, not real history).
 
 **Lesson — codified in CLAUDE.md don'ts:** `CREATE TABLE IF NOT EXISTS` does not migrate columns. For every new column, also ship an idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in the same commit. The 2026-06-12 protective plan adds a boot-time schema-drift assertion (T4) to catch the next instance loudly instead of silently.
+
+## 2026-08-17 — Plan generation 404: `llama-3.3-70b-versatile` decommissioned by Groq
+
+**Symptom:** `/checkin` submit failed with `Error code: 404 - {'error': {'message': 'The model `llama-3.3-70b-versatile` does not exist or you do not have access to it.', ...}}`.
+
+**Root cause:** Groq emailed a deprecation notice on 2026-06-17 for `llama-3.3-70b-versatile` (free/dev-tier accounts), recommending migration to `openai/gpt-oss-120b` or `qwen/qwen3.6-27b`. The grace period apparently ended and the model started 404ing sometime before 2026-08-16. Confirmed via `console.groq.com/docs/deprecations` and Groq's live `docs/models.md` listing (which no longer includes `llama-3.3-70b-versatile`, `deepseek-r1-distill-llama-70b`, or `moonshotai/kimi-k2-*` at all — those per-model docs pages stay live after decommissioning, which is misleading if you check the wrong page).
+
+**Not caught locally first:** `GROQ_API_KEY` was blank in the local `.env` (same Sensitive-flag wipe as the 2026-08-01 incident, still unfixed — re-pulling from Vercel came back blank too), so this diagnosis relied on the error text + Groq's own docs rather than a local repro.
+
+**Fix (2026-08-17):**
+- Swapped `GROQ_MODEL` default to `openai/gpt-oss-120b` (production tier, cheapest production-tier option at $0.15/$0.60 per 1M tokens; `qwen/qwen3.6-27b` was preview-tier only and ~4-5x pricier, `openai/gpt-oss-20b` was rejected outright — same model that caused the 2026-06-04 empty-content incident above).
+- `openai/gpt-oss-120b` is a reasoning model, same family as `gpt-oss-20b`. Added `reasoning_format="hidden"` and bumped `max_tokens` from 4096 → 8192 in `core/llm_client.py` specifically to avoid reproducing that incident.
+- Also rotated `GROQ_API_KEY` and this time set both it and `GROQ_MODEL` to Plain (not Sensitive) in Vercel, per the 3-copy rule in `notes/secrets-runbook.md`.
+
+**Lesson:** Every currently-live text model on Groq (`gpt-oss-120b`, `gpt-oss-20b`, `qwen3.6-27b`, `minimax-m2.7`) is a reasoning model now — there's no more "boring non-reasoning model" escape hatch on this provider. `reasoning_format="hidden"` + generous `max_tokens` headroom is now a permanent requirement, not a one-off fix.

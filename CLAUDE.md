@@ -37,13 +37,26 @@ Full architecture, env vars, deploy steps, troubleshooting: see `README.md`.
 - **SQLite is ephemeral on serverless.** All persistent state → Neon Postgres.
 - **The live plan lives in the one-row Postgres `schedule` table** (ADR-002) — the LLM rewrites it each Submit via `save_schedule()`. `config/schedule.json` is a seed/template only; after editing it, push with `python3 scripts/push_schedule.py`. Never write runtime state to the bundle filesystem — Vercel reverts it on cold start. `docs/personal-workout-plan.md` is historical reference only — don't sync from it.
 - **System A is retired.** Don't resurrect `legacy_email/` code or routine `trig_01XUTpwZgjKkJw6VDq4HpZSh`.
-- **`llama-3.3-70b-versatile` does not support `json_schema` on Groq.** Use `json_object` + explicit JSON skeleton in the system prompt + Pydantic validation.
+- **`json_schema` (strict mode) is not used for the planner on Groq.** Use `json_object` + explicit JSON skeleton in the system prompt + Pydantic validation instead.
+- **Planner model is `openai/gpt-oss-120b`, a reasoning model.** `reasoning_format="hidden"` must stay set in `core/llm_client.py` or hidden reasoning tokens can eat the whole `max_tokens` budget and return empty content (bit `gpt-oss-20b` once, then `llama-3.3-70b-versatile` after Groq deprecated it 2026-06-17 — see `notes/system-b-history.md`, 2026-08-17 entry). Before swapping models again, check `console.groq.com/docs/deprecations` — Groq's per-model docs pages stay live after a model is decommissioned, so a page existing doesn't mean the model is still callable.
 - **PDFShift needs explicit `format` + `landscape` in the API payload.** CSS `@page` alone is unreliable — silently defaults to portrait and the grid spills to a 2nd page.
 - **PDF layout constants live at the top of `core/pdf.py`** and are threaded into the Jinja template. Don't duplicate them in the template.
 - **Before pushing LLM prompt changes**: `python3 scripts/test_plan.py`. For newsletter changes: `python3 scripts/test_newsletter.py`.
 
+## Handoff files
+
+Session handoffs are **not** stored in this repo — they're written to the
+user's OS temp directory, e.g.
+`/var/folders/wg/l5z35xts1dv1g3xkcxb2qg100000gn/T/gym-research-handoff-<date>.md`
+(macOS `$TMPDIR`; check that env var since the exact path is
+machine-specific). At the start of a session, check there (and the
+project root, for older handoffs) before reading through docs from
+scratch — `mdfind -name handoff` or `find "$TMPDIR" -iname '*handoff*'`
+will locate them.
+
 ## Deeper docs (open on demand)
 
+- `spec/` — 10-file implementation spec (overview, tech stack, repo layout, weekly-loop architecture, data model, engineering constraints, progression/LLM rules, security model, newsletter design, environment/deployment/testing gaps). Written for an agent to plan/build against without re-deriving context from README/ADRs.
 - `README.md` — collaborator onboarding, env vars, deploy, troubleshooting, newsletter design, future stages.
 - `notes/newsletter-constraints.md` — load-bearing newsletter design rules (brand, fact source, hero rotation, email-safe HTML).
 - `notes/email-operations.md` — Resend domain setup, Apple Mail Privacy Protection behavior.

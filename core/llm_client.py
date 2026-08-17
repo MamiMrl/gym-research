@@ -58,15 +58,20 @@ def generate_plan(schedule: dict, transcript: str) -> dict:
 
     resp = client.chat.completions.create(
         model=GROQ_MODEL,
-        max_tokens=8192,
+        max_tokens=4096,
         temperature=0.2,
         response_format={"type": "json_object"},
-        # openai/gpt-oss-120b is a reasoning model — hidden reasoning tokens
-        # count against max_tokens too. Without reasoning_format="hidden" a
-        # long reasoning pass can consume the whole budget and leave nothing
-        # for the actual JSON output (this already happened once with
-        # gpt-oss-20b, see README.md troubleshooting).
-        reasoning_format="hidden",
+        # openai/gpt-oss-120b is a reasoning model. reasoning_format (used by
+        # Qwen/DeepSeek on Groq) is NOT supported here — for gpt-oss models
+        # reasoning_effort controls actual reasoning-token consumption and
+        # include_reasoning controls whether it's echoed back. Without this,
+        # reasoning can eat the whole max_tokens budget and leave nothing for
+        # the actual JSON output (this already happened once with gpt-oss-20b,
+        # see README.md troubleshooting). max_tokens also has to stay well
+        # under this Groq org's 8000 TPM on-demand-tier limit alongside input.
+        # Groq-specific params, not part of the openai SDK's typed signature —
+        # must go through extra_body or .create() rejects them as unknown.
+        extra_body={"reasoning_effort": "low", "include_reasoning": False},
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_message},
